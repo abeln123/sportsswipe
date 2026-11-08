@@ -19,6 +19,7 @@ pub fn routes() -> Router<AppState> {
         .route("/admin/settle-market", post(settle_market))
         .route("/admin/settle-contest-day", post(settle_contest_day))
         .route("/admin/lock-market", post(lock_market))
+        .route("/admin/reset-presentation", post(reset_presentation))
 }
 
 #[derive(Deserialize)]
@@ -126,3 +127,20 @@ async fn lock_market(State(state): State<AppState>, _: AdminUser, Json(b): Json<
     }
     Ok(Json(json!({ "locked": true })))
 }
+
+async fn reset_presentation(State(state): State<AppState>, AdminUser(admin): AdminUser) -> ApiResult<Json<Value>> {
+    let mut tx = state.pool.begin().await?;
+    sqlx::query(
+        "DELETE FROM collectible_sales WHERE collectible_id IN (SELECT id FROM diamond_collectibles WHERE earner_id = $1 AND qualification_source = 'admin_presentation')",
+    )
+    .bind(admin.id)
+    .execute(&mut *tx)
+    .await?;
+    sqlx::query("DELETE FROM diamond_collectibles WHERE earner_id = $1 AND qualification_source = 'admin_presentation'")
+        .bind(admin.id)
+        .execute(&mut *tx)
+        .await?;
+    tx.commit().await?;
+    Ok(Json(json!({ "reset": true })))
+}
+

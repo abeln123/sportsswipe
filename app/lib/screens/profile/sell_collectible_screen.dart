@@ -155,6 +155,29 @@ class _SellCollectibleState extends State<SellCollectibleScreen> {
     }
   }
 
+  Future<void> _reset() async {
+    if (_busy) return;
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      try {
+        await api.post('/collectibles/presentation/reset', {});
+      } catch (_) {
+        await api.post('/admin/reset-presentation', {});
+      }
+      _steps.clear();
+      _edition = null;
+      _sale = null;
+      await _refresh();
+    } catch (e) {
+      if (mounted) setState(() => _error = e.toString());
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = _card;
@@ -232,6 +255,10 @@ class _SellCollectibleState extends State<SellCollectibleScreen> {
             busy: _busy,
             onPressed: _run,
           ),
+        if (widget.presentation && (_edition != null || _sale != null)) ...[
+          const SizedBox(height: 10),
+          GhostButton('Reset demo sale', onPressed: _busy ? null : _reset),
+        ],
         TextButton(onPressed: _busy ? null : _refresh, child: const Text('Refresh confirmed ownership')),
         if (_dashboard == null && _error == null) const LinearProgressIndicator(),
       ],

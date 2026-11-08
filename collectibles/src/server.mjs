@@ -89,6 +89,14 @@ async function dispatch(path,method,b,user){
   }
   return {id:sale.id,status:sale.status,buyer:buyerAddress,lamports:sale.lamports};
  }
+ if(path==='presentation/reset' && method==='POST'){
+  if(!await isAdmin(user))fail('Admin access required.',403);
+  await tx(async db=>{
+   await db.query("DELETE FROM collectible_sales WHERE collectible_id IN (SELECT id FROM diamond_collectibles WHERE earner_id=$1 AND qualification_source='admin_presentation')",[user]);
+   await db.query("DELETE FROM diamond_collectibles WHERE earner_id=$1 AND qualification_source='admin_presentation'",[user]);
+  });
+  return {reset:true};
+ }
  if(path==='handoff' && method==='POST'){
   const ticket=randomBytes(32).toString('hex');await pool.query("INSERT INTO collectible_sessions VALUES ($1,$2,'handoff',now()+interval '2 minutes')",[hash(ticket),user]);
   return {url:`${base.origin}/collectibles/index.html#${ticket}`};
@@ -100,10 +108,10 @@ async function dispatch(path,method,b,user){
  });
  if(path==='wallet/challenge' && method==='POST'){
   const addr=address(b.address);const old=(await pool.query('SELECT address,verified FROM collectible_wallets WHERE user_id=$1',[user])).rows[0];
-  if(old?.verified && old.address!==addr)fail('Use your already linked demo wallet for this account.');
+  if(old?.verified && old.address!==addr && !await isAdmin(user))fail('Use your already linked demo wallet for this account.');
   const message=`Sports Swipe devnet wallet verification\nOrigin: ${base.origin}\nAccount: ${user}\nWallet: ${addr}\nNonce: ${randomBytes(24).toString('hex')}\nThis signature does not authorize a payment.`;
   await pool.query(`INSERT INTO collectible_wallets(user_id,address,challenge,challenge_expires) VALUES ($1,$2,$3,now()+interval '5 minutes')
-   ON CONFLICT(user_id) DO UPDATE SET challenge=EXCLUDED.challenge,challenge_expires=EXCLUDED.challenge_expires,address=EXCLUDED.address`,[user,addr,message]);return {message};
+   ON CONFLICT(user_id) DO UPDATE SET challenge=EXCLUDED.challenge,challenge_expires=EXCLUDED.challenge_expires,address=EXCLUDED.address,verified=CASE WHEN collectible_wallets.address=EXCLUDED.address THEN collectible_wallets.verified ELSE false END`,[user,addr,message]);return {message};
  }
  if(path==='wallet/verify' && method==='POST')return tx(async db=>{
   const w=(await db.query('SELECT * FROM collectible_wallets WHERE user_id=$1 FOR UPDATE',[user])).rows[0];

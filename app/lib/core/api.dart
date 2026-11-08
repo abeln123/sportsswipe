@@ -65,13 +65,15 @@ class Api {
   Map<String, String> get _headers => {'Content-Type': 'application/json', if (_token != null) 'Authorization': 'Bearer $_token'};
 
   /// Returns the raw status and body. Network failures become status 0.
-  Future<ApiResponse> raw(String method, String path, {Object? body, Duration timeout = const Duration(seconds: 12)}) async {
+  Future<ApiResponse> raw(String method, String path, {Object? body, Duration? timeout}) async {
+    final effectiveTimeout = timeout ??
+        (path.startsWith('/collectibles/') ? const Duration(seconds: 45) : const Duration(seconds: 12));
     final uri = Uri.parse('$base/v1$path');
     if (method != 'GET') _warm.clear();
     try {
       final req = http.Request(method, uri)..headers.addAll(_headers);
       if (body != null) req.body = jsonEncode(body);
-      final streamed = await _client.send(req).timeout(timeout);
+      final streamed = await _client.send(req).timeout(effectiveTimeout);
       final res = await http.Response.fromStream(streamed);
       Object? decoded;
       try {
