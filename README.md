@@ -28,6 +28,22 @@ Sign up with an email listed in `ADMIN_EMAILS` to get the admin screen
 (Profile → Admin), where markets can be locked and settled with
 `POST /v1/admin/settle-market`.
 
+## Run in the iOS Simulator
+
+Requires full Xcode (App Store) and CocoaPods (`brew install cocoapods`).
+
+```sh
+sudo xcode-select --switch /Applications/Xcode.app/Contents/Developer
+sudo xcodebuild -runFirstLaunch
+xcodebuild -downloadPlatform iOS          # simulator runtime, if Xcode didn't install one
+open -a Simulator                         # boots an iPhone
+(cd app && flutter run -d iPhone)         # the API must be running on localhost:8080
+```
+
+The simulator reaches the Mac's `localhost`. For a real iPhone on the same
+Wi-Fi, run the API with `PUBLIC_BASE_URL=http://<mac-ip>:8080` and the app with
+`flutter run --dart-define=API_BASE=http://<mac-ip>:8080`.
+
 ## Tests
 
 ```sh

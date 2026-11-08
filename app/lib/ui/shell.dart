@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -20,7 +21,7 @@ class PhoneFrame extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
-    if (size.width < 560) return child;
+    if (!kIsWeb || size.width < 560) return child;
     final h = (size.height - 48).clamp(640.0, 900.0);
     return ColoredBox(
       color: const Color(0xFF06110E),
