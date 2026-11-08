@@ -97,6 +97,37 @@ void main() {
           };
         }
         if (r.url.path == '/v1/friends') body = {'friends': []};
+        if (r.url.path == '/v1/deck') {
+          body = {
+            'cards': [
+              {
+                'card': {
+                  'playerId': 10,
+                  'fullName': 'Josh Allen',
+                  'firstName': 'Josh',
+                  'lastName': 'Allen',
+                  'teamAbbr': 'BUF',
+                  'league': 'nfl',
+                  'jerseyNumber': '17',
+                  'colorway': {'base': '00338D'},
+                },
+                'market': {
+                  'marketId': 101,
+                  'lineVersion': 1,
+                  'line': 265.5,
+                  'statKey': 'pass_yds',
+                  'statLabel': 'Passing yards',
+                  'statShort': 'PASS YDS',
+                  'lockAt': '2030-01-01T00:00:00Z',
+                  'startAt': '2030-01-01T00:00:00Z',
+                  'matchup': 'BUF vs MIA',
+                },
+                'recentForm': [240, 280, 310, 255, 290],
+                'mastery': {'tier': 'base', 'count': 1, 'nextTier': 'bronze', 'nextAt': 20},
+              },
+            ],
+          };
+        }
         if (r.url.path == '/v1/head-to-heads') {
           commands.add((jsonDecode(r.body) as Map)['commandId'] as String);
           if (failInvite) return http.Response('<html>Old server</html>', 404);
@@ -158,6 +189,14 @@ void main() {
     await t.tap(find.text('NFL'));
     await t.pumpAndSettle();
     expect(container.read(playModeProvider).sport, 'nfl');
+    await t.tap(find.text('Parlays'));
+    await t.pumpAndSettle();
+    expect(container.read(playModeProvider).parlay, isTrue);
+    expect(container.read(playCardsProvider), isFalse);
+    expect(find.text('Packs'), findsOneWidget);
+    expect(find.text('3×'), findsOneWidget);
+    await t.tap(find.text('Packs'));
+    await t.pumpAndSettle();
     container.read(playCardsProvider.notifier).set(true);
     await t.pumpAndSettle();
     expect(find.text('Parlays'), findsNothing);

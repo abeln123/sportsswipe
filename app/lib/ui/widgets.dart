@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../core/api.dart';
 import '../core/format.dart' as f;
 import '../core/theme.dart';
 
@@ -84,6 +85,7 @@ class UnderTabs extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final compact = trailing != null;
     return Container(
       decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: C.line))),
       child: Row(
@@ -92,8 +94,8 @@ class UnderTabs extends StatelessWidget {
             InkWell(
               onTap: () => onChanged(i),
               child: Container(
-                padding: const EdgeInsets.fromLTRB(6, 12, 14, 10),
-                margin: const EdgeInsets.only(right: 10),
+                padding: EdgeInsets.fromLTRB(compact ? 2 : 6, 12, compact ? 8 : 14, 10),
+                margin: EdgeInsets.only(right: compact ? 6 : 10),
                 decoration: BoxDecoration(
                   border: Border(bottom: BorderSide(color: i == index ? C.green : Colors.transparent, width: 2)),
                 ),
@@ -110,8 +112,16 @@ class UnderTabs extends StatelessWidget {
                 ]),
               ),
             ),
-          const Spacer(),
-          ?trailing,
+          if (trailing != null) ...[
+            const SizedBox(width: 8),
+            Expanded(
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: FittedBox(fit: BoxFit.scaleDown, child: trailing),
+              ),
+            ),
+          ] else
+            const Spacer(),
         ],
       ),
     );
@@ -520,11 +530,20 @@ class ErrorText extends StatelessWidget {
   final Object error;
   final VoidCallback? onRetry;
   @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 32),
-        child: Column(children: [
-          Text(error.toString(), style: T.dim, textAlign: TextAlign.center),
-          if (onRetry != null) GhostButton('Try again', onPressed: onRetry, color: C.green),
-        ]),
-      );
+  Widget build(BuildContext context) {
+    final text = error is ApiException ? (error as ApiException).message : 'Could not load this view right now.';
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 20),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(text, style: T.dim, textAlign: TextAlign.center),
+          if (onRetry != null) ...[
+            const SizedBox(height: 8),
+            GhostButton('Try again', onPressed: onRetry, color: C.green),
+          ],
+        ],
+      ),
+    );
+  }
 }

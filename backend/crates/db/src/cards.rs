@@ -145,7 +145,7 @@ const MARKET_SELECT: &str = r#"
     SELECT m.id AS market_id, m.player_id, m.stat_key, sd.label AS stat_label, sd.short_label AS stat_short,
            m.lock_at, m.status, m.current_version AS line_version, lv.line_x10, g.id AS game_id, g.start_at,
            g.status AS game_status, ht.abbr AS home_abbr, at.abbr AS away_abbr,
-           (p.team_id = g.home_team_id) AS is_home,
+           COALESCE(p.team_id = g.home_team_id, false) AS is_home,
            COALESCE(pc.over_count, 0) AS over_count, COALESCE(pc.under_count, 0) AS under_count,
            (m.status = 'open' AND now() < m.lock_at) AS open_now
     FROM markets m
@@ -165,15 +165,14 @@ pub async fn market_rows(pool: &PgPool, market_ids: &[i64]) -> Result<Vec<Market
         .await?)
 }
 
-/// Open markets for the deck, soonest lock first, skipping ones the user has
-/// already picked as a single.
+/// Open markets for the deck, soonest lock first, prioritizing ones the user
+/// has not yet picked as a single.
 pub async fn deck_market_ids(pool: &PgPool, user_id: Uuid, league: Option<&str>, limit: i64) -> Result<Vec<i64>> {
     Ok(sqlx::query_scalar(
         r#"SELECT m.id FROM markets m JOIN players p ON p.id = m.player_id
            WHERE NOT EXISTS(SELECT 1 FROM presentation_cards pc WHERE pc.player_id=p.id) AND m.status = 'open' AND m.lock_at > now()
              AND ($2::text IS NULL OR p.league = $2)
-             AND NOT EXISTS (SELECT 1 FROM entries e WHERE e.user_id = $1 AND e.single_market_id = m.id)
-           ORDER BY m.lock_at, m.id LIMIT $3"#,
+           ORDER BY EXISTS (SELECT 1 FROM entries e WHERE e.user_id = $1 AND e.single_market_id = m.id), m.lock_at, m.id LIMIT $3"#,
     )
     .bind(user_id)
     .bind(league)

@@ -109,7 +109,7 @@ class AppHeader extends ConsumerWidget {
     return SizedBox(
       height: 48,
       child: Padding(
-        padding: EdgeInsets.only(left: play ? 8 : 16, right: 16),
+        padding: EdgeInsets.only(left: play && cards ? 8 : 20, right: 20),
         child: Row(
           children: [
             if (play && !cards) const Text('Play', style: T.h2),

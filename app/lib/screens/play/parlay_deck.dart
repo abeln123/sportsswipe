@@ -19,7 +19,16 @@ import '../../ui/widgets.dart';
 
 Future<List<PlayableCard>> loadDeck(String sport, {int limit = 8}) async {
   final r = await api.get('/deck?sport=$sport&limit=$limit');
-  return (r['cards'] as List).map((e) => PlayableCard.fromJson((e as Map).cast<String, dynamic>())).toList();
+  final raw = (r['cards'] as List?) ?? const [];
+  final cards = <PlayableCard>[];
+  for (final item in raw) {
+    if (item is Map) {
+      try {
+        cards.add(PlayableCard.fromJson(item.cast<String, dynamic>()));
+      } catch (_) {}
+    }
+  }
+  return cards;
 }
 
 class Leg {
@@ -98,6 +107,14 @@ class _ParlayDeckState extends ConsumerState<ParlayDeck> {
   void _add(String side) {
     if (_legs.length >= maxLegs) return;
     setState(() => _legs.add(Leg(_queue!.removeAt(0), side)));
+  }
+
+  void _removeAt(int index) {
+    if (index < 0 || index >= _legs.length) return;
+    setState(() {
+      final removed = _legs.removeAt(index);
+      _queue?.insert(0, removed.card);
+    });
   }
 
   bool _inDraft(PlayableCard c) => _legs.any((l) => l.card.market.marketId == c.market.marketId);
@@ -216,55 +233,128 @@ class _ParlayDeckState extends ConsumerState<ParlayDeck> {
   }
 
   Widget _slots() {
-    return Row(children: [
-      for (var i = 0; i < maxLegs; i++)
-        Expanded(
-          child: Container(
-            margin: const EdgeInsets.symmetric(horizontal: 3),
-            padding: const EdgeInsets.only(bottom: 8, top: 10),
-            decoration: BoxDecoration(
-              border: Border(
-                bottom: BorderSide(
-                  color: i < _legs.length ? (_legs[i].side == 'over' ? C.over : C.under) : C.line,
-                  width: 1.5,
-                ),
+    const badges = ['Leg 1', '3×', '6×', '10×', '20×'];
+    return Padding(
+      padding: const EdgeInsets.only(top: 4, bottom: 2),
+      child: Row(
+        children: [
+          for (var i = 0; i < maxLegs; i++)
+            Expanded(
+              child: Padding(
+                padding: EdgeInsets.only(left: i == 0 ? 0 : 4, right: i == maxLegs - 1 ? 0 : 4),
+                child: i < _legs.length
+                    ? Semantics(
+                        button: true,
+                        label: 'Remove ${_legs[i].card.card.fullName} from parlay',
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(10),
+                          onTap: () => _removeAt(i),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 7),
+                            decoration: BoxDecoration(
+                              color: C.surface,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: (_legs[i].side == 'over' ? C.over : C.under).withValues(alpha: 0.75),
+                                width: 1.2,
+                              ),
+                            ),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        _legs[i].card.card.lastName.isEmpty
+                                            ? _legs[i].card.card.fullName
+                                            : _legs[i].card.card.lastName,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        textAlign: TextAlign.center,
+                                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: C.text),
+                                      ),
+                                    ),
+                                    const Icon(Icons.close, size: 11, color: C.dim),
+                                  ],
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  _legs[i].card.market.isGame
+                                      ? _legs[i].card.market.pickText(_legs[i].side)
+                                      : '${_legs[i].side == 'over' ? 'O' : 'U'} ${f.line(_legs[i].card.market.line)}',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                    color: _legs[i].side == 'over' ? C.over : C.under,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      )
+                    : Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 7),
+                        decoration: BoxDecoration(
+                          color: C.surface.withValues(alpha: 0.45),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: C.line.withValues(alpha: 0.85)),
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              badges[i],
+                              maxLines: 1,
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w700,
+                                color: i < 2 ? C.text.withValues(alpha: 0.75) : C.dim,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              i < 2 ? 'Required' : 'Bonus',
+                              maxLines: 1,
+                              style: const TextStyle(fontSize: 10.5, color: C.dim),
+                            ),
+                          ],
+                        ),
+                      ),
               ),
             ),
-            child: Column(children: [
-              Text('${i + 1}',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w700,
-                    color: i < _legs.length ? (_legs[i].side == 'over' ? C.over : C.under) : C.dim,
-                  )),
-              const SizedBox(height: 3),
-              if (i < _legs.length) ...[
-                Text(_legs[i].card.card.lastName.isEmpty ? _legs[i].card.card.fullName : _legs[i].card.card.lastName,
-                    maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                Text(
-                    _legs[i].card.market.isGame
-                        ? _legs[i].card.market.pickText(_legs[i].side)
-                        : '${_legs[i].side == 'over' ? 'O' : 'U'} ${f.line(_legs[i].card.market.line)}',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: T.small),
-              ] else
-                Text(i == 0 ? 'First leg' : i == 1 ? 'Second' : 'Optional', style: T.small.copyWith(fontSize: 12.5)),
-            ]),
-          ),
-        ),
-    ]);
+        ],
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_error != null) return ErrorText(_error!, onRetry: _reload);
+    if (_error != null) return Center(child: ErrorText(_error!, onRetry: _reload));
     if (_queue == null) return const Loading.card();
     final queue = _queue!;
     final n = _legs.length;
     final full = n >= maxLegs;
     final done = queue.isEmpty;
+    if (done && n == 0) {
+      return ListView(
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+        children: [
+          EmptyState(
+            icon: Icons.layers_outlined,
+            title: 'No open lines right now',
+            body: 'Parlays combine 2 to 5 predictions into one higher-multiplier entry. Check back when the next slate opens.',
+            action: GhostButton('Refresh lines', color: C.green, bold: true, onPressed: _reload),
+          ),
+        ],
+      );
+    }
     return Column(children: [
-      Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: _slots()),
+      Padding(padding: const EdgeInsets.symmetric(horizontal: 20), child: _slots()),
       Expanded(
         child: AnimatedSwitcher(
           duration: const Duration(milliseconds: 220),
@@ -275,16 +365,19 @@ class _ParlayDeckState extends ConsumerState<ParlayDeck> {
                     child: Column(children: [
                       Text(full ? 'FIVE LEGS ADDED' : 'END OF DECK', style: T.label),
                       const SizedBox(height: 10),
-                      Text(n >= 2 ? 'Review parlay' : 'Not enough legs', style: T.h1),
+                      Text(n >= 2 ? 'Review parlay' : 'Add one more leg', style: T.h1),
                       const SizedBox(height: 10),
                       Text(
                         n >= 2
                             ? 'Review your calls and choose one coin wager. Nothing is locked yet.'
-                            : 'A parlay needs at least two legs. Load another deck to keep building.',
+                            : 'A parlay needs at least two legs. Load more cards or tap your selected leg above to clear it.',
                         style: T.dim,
                         textAlign: TextAlign.center,
                       ),
-                      if (done && !full) GhostButton('Load more cards', color: C.green, onPressed: _reload),
+                      if (done && !full) ...[
+                        const SizedBox(height: 12),
+                        GhostButton('Load more cards', color: C.green, bold: true, onPressed: _reload),
+                      ],
                     ]),
                   ),
                 ])
@@ -312,43 +405,58 @@ class _ParlayDeckState extends ConsumerState<ParlayDeck> {
         ),
       ),
       Collapse(
-        visible: n >= 2 || full || done,
+        visible: n >= 1 || full,
         alignment: Alignment.bottomCenter,
         child: Container(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
-          decoration: const BoxDecoration(border: Border(top: BorderSide(color: C.line))),
+          padding: const EdgeInsets.fromLTRB(20, 10, 20, 12),
+          decoration: const BoxDecoration(
+            color: C.bg,
+            border: Border(top: BorderSide(color: C.line)),
+          ),
           child: Column(children: [
             Row(children: [
               Text('$n ${n == 1 ? 'leg' : 'legs'} selected', style: const TextStyle(fontWeight: FontWeight.w600)),
               const Spacer(),
-              Text(n >= 2 ? '${parlayMultiplier(n)}× wager + ${legBonus * n} coins' : '2–5 legs · one entry',
-                  style: const TextStyle(fontWeight: FontWeight.w600, color: C.dim)),
+              Text(
+                n >= 2 ? '${parlayMultiplier(n)}× wager + ${legBonus * n} coins' : 'Pick 1 more leg for 3×',
+                style: TextStyle(fontWeight: FontWeight.w600, color: n >= 2 ? C.green : C.dim),
+              ),
             ]),
-            const SizedBox(height: 10),
-            PrimaryButton(
-              n >= 2 ? 'Review parlay' : 'Add ${2 - n} more ${2 - n == 1 ? 'leg' : 'legs'}',
-              onPressed: n >= 2 ? _review : null,
-            ),
+            if (n >= 2) ...[
+              const SizedBox(height: 10),
+              PrimaryButton('Review $n-leg parlay', onPressed: _review),
+            ],
           ]),
         ),
       ),
     ]);
   }
 
-  Widget _card(PlayableCard c, int left) => SportCard(
-        spec: c.card,
-        market: c.market,
-        width: 340,
-        topRight: '$left LEFT',
-        body: Column(children: [
-          Container(height: 1, color: const Color(0xFFCBD3DB), margin: const EdgeInsets.only(top: 8)),
-          RecentForm(values: c.recentForm, statLabel: c.market.statLabel.toLowerCase()),
-          CommunityBar(overPct: c.market.overPct, total: c.market.communityTotal),
-        ]),
-        footer: CardFooter(
-          spec: c.card,
-          left: '${c.mastery.displayTier.toUpperCase()} / ${f.two(c.card.cardNo)}',
-          right: c.mastery.nextTier == null ? 'Diamond earned' : 'Earn ${f.cap(c.mastery.nextTier!)}: ${c.mastery.count}/${c.mastery.nextAt}',
+  Widget _card(PlayableCard c, int left) {
+    final m = c.market;
+    return SportCard(
+      spec: c.card,
+      market: m,
+      width: 340,
+      topRight: '$left LEFT',
+      body: Column(children: [
+        Container(height: 1, color: const Color(0xFFCBD3DB), margin: const EdgeInsets.only(top: 8)),
+        RecentForm(
+          values: c.recentForm,
+          statLabel: m.isGame ? (m.statKey == 'total' ? 'total points' : 'point margin, ${m.homeAbbr}') : m.statLabel.toLowerCase(),
         ),
-      );
+        CommunityBar(
+          overPct: m.overPct,
+          total: m.communityTotal,
+          overLabel: m.isGame ? m.overLabel : 'Over',
+          underLabel: m.isGame ? m.underLabel : 'Under',
+        ),
+      ]),
+      footer: CardFooter(
+        spec: c.card,
+        left: '${c.mastery.displayTier.toUpperCase()} / ${f.two(c.card.cardNo)}',
+        right: c.mastery.nextTier == null ? 'Diamond earned' : 'Earn ${f.cap(c.mastery.nextTier!)}: ${c.mastery.count}/${c.mastery.nextAt}',
+      ),
+    );
+  }
 }

@@ -54,7 +54,7 @@ class _PlayScreenState extends ConsumerState<PlayScreen> with SingleTickerProvid
     }
     HapticFeedback.selectionClick();
     ref.read(playMenuProvider.notifier).close();
-    ref.read(playCardsProvider.notifier).set(next.parlay && !next.contests);
+    ref.read(playCardsProvider.notifier).set(false);
     ref.read(playModeProvider.notifier).set(next.copyWith(revision: ref.read(playModeProvider).revision + 1));
   }
 
@@ -119,39 +119,85 @@ class _PlayScreenState extends ConsumerState<PlayScreen> with SingleTickerProvid
   }
 }
 
-/// Text tabs stay visible on the shelf and reappear from the card menu.
+/// Primary mode tabs with a compact inline sport pill switcher.
 class PlayNavigation extends StatelessWidget {
   const PlayNavigation({super.key, required this.mode, required this.onSelect});
   final PlayMode mode;
   final ValueChanged<PlayMode> onSelect;
+
   @override
   Widget build(BuildContext context) => Material(
     color: C.bg,
     child: Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          UnderTabs(
-            labels: const ['Packs', 'Parlays', 'Contests'],
-            index: mode.contests
-                ? 2
-                : mode.parlay
-                ? 1
-                : 0,
-            onChanged: (i) => onSelect(mode.copyWith(contests: i == 2, parlay: i == 1)),
-          ),
-          if (!mode.contests)
-            Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: UnderTabs(
-                labels: const ['All sports', 'NFL', 'NBA'],
-                index: const ['all', 'nfl', 'nba'].indexOf(mode.sport),
-                onChanged: (i) => onSelect(mode.copyWith(sport: const ['all', 'nfl', 'nba'][i])),
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 6),
+      child: UnderTabs(
+        labels: const ['Packs', 'Parlays', 'Contests'],
+        index: mode.contests
+            ? 2
+            : mode.parlay
+            ? 1
+            : 0,
+        onChanged: (i) => onSelect(mode.copyWith(contests: i == 2, parlay: i == 1)),
+        trailing: mode.contests
+            ? null
+            : _SportFilter(
+                sport: mode.sport,
+                onChanged: (s) => onSelect(mode.copyWith(sport: s)),
+              ),
+      ),
+    ),
+  );
+}
+
+class _SportFilter extends StatelessWidget {
+  const _SportFilter({required this.sport, required this.onChanged});
+  final String sport;
+  final ValueChanged<String> onChanged;
+
+  static const _items = [('all', 'All sports'), ('nfl', 'NFL'), ('nba', 'NBA')];
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(2),
+    decoration: BoxDecoration(
+      color: C.surface,
+      borderRadius: BorderRadius.circular(18),
+      border: Border.all(color: C.line),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        for (final (key, label) in _items)
+          Semantics(
+            button: true,
+            selected: sport == key,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(15),
+              onTap: () => onChanged(key),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 160),
+                curve: Curves.easeOutCubic,
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                decoration: BoxDecoration(
+                  color: sport == key ? const Color(0xFF1A3A30) : Colors.transparent,
+                  borderRadius: BorderRadius.circular(15),
+                  border: Border.all(
+                    color: sport == key ? C.green.withValues(alpha: 0.55) : Colors.transparent,
+                  ),
+                ),
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: sport == key ? FontWeight.w700 : FontWeight.w500,
+                    color: sport == key ? C.green : C.dim,
+                    height: 1.1,
+                  ),
+                ),
               ),
             ),
-        ],
-      ),
+          ),
+      ],
     ),
   );
 }
