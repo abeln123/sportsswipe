@@ -5,9 +5,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../core/api.dart';
 import '../core/format.dart' as f;
 import '../core/theme.dart';
 import '../screens/picks_screen.dart';
+import '../state/immersive.dart';
 import '../state/pick_queue.dart';
 import '../state/session.dart';
 import 'widgets.dart';
@@ -86,23 +88,57 @@ class AppHeader extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final balance = ref.watch(displayBalanceProvider);
     final loaded = ref.watch(summaryProvider).loaded;
-    return Container(
-      height: 62,
-      padding: const EdgeInsets.only(left: 20),
-      decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: C.line))),
+    final immersive = ref.watch(immersiveProvider);
+    return SizedBox(
+      height: 44,
       child: Row(children: [
-        Transform(transform: Matrix4.skewX(-0.3), child: Container(width: 12, height: 20, color: C.green)),
-        const SizedBox(width: 10),
-        const Text('Sports Swipe', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800, color: C.text)),
+        AnimatedOpacity(
+          opacity: immersive ? 1 : 0,
+          duration: const Duration(milliseconds: 200),
+          child: IgnorePointer(
+            ignoring: !immersive,
+            child: Semantics(
+              button: true,
+              label: 'Show menu',
+              excludeSemantics: true,
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => ref.read(immersiveProvider.notifier).set(false),
+                child: const Padding(
+                  padding: EdgeInsets.fromLTRB(16, 8, 16, 8),
+                  child: Row(children: [
+                    Icon(Icons.keyboard_arrow_down_rounded, color: C.dim, size: 22),
+                    SizedBox(width: 2),
+                    Text('Menu', style: TextStyle(color: C.dim, fontSize: 13, fontWeight: FontWeight.w600)),
+                  ]),
+                ),
+              ),
+            ),
+          ),
+        ),
         const Spacer(),
-        Container(width: 1, color: C.line, margin: const EdgeInsets.symmetric(vertical: 8)),
         Semantics(
           label: 'Coin balance ${f.coins(balance)}',
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 20, 0),
-            child: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const Text('Coins', style: TextStyle(fontSize: 12, color: C.dim)),
-              Text(loaded ? f.coins(balance) : '—', style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: C.text)),
+          excludeSemantics: true,
+          child: Container(
+            margin: const EdgeInsets.only(right: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(color: C.surface, borderRadius: BorderRadius.circular(20), border: Border.all(color: C.line)),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              const Icon(Icons.toll_rounded, size: 16, color: C.green),
+              const SizedBox(width: 6),
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 220),
+                transitionBuilder: (child, a) => FadeTransition(
+                  opacity: a,
+                  child: SlideTransition(position: Tween(begin: const Offset(0, 0.4), end: Offset.zero).animate(a), child: child),
+                ),
+                child: Text(
+                  loaded ? f.coins(balance) : '—',
+                  key: ValueKey(loaded ? balance : -1),
+                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: C.text),
+                ),
+              ),
             ]),
           ),
         ),
@@ -119,8 +155,9 @@ class AppShell extends ConsumerStatefulWidget {
   ConsumerState<AppShell> createState() => _AppShellState();
 }
 
-class _AppShellState extends ConsumerState<AppShell> {
+class _AppShellState extends ConsumerState<AppShell> with SingleTickerProviderStateMixin {
   late final AppLifecycleListener _life;
+  late final AnimationController _tabFade = AnimationController(vsync: this, duration: const Duration(milliseconds: 180), value: 1);
   StreamSubscription<QueueEvent>? _events;
   Timer? _poll;
   bool _showingResults = false;
@@ -145,10 +182,39 @@ class _AppShellState extends ConsumerState<AppShell> {
     });
     // Picks are graded by the worker; check for new results periodically.
     _poll = Timer.periodic(const Duration(seconds: 45), (_) => ref.read(summaryProvider.notifier).refresh());
+    _warmTabs();
+  }
+
+  /// Loads what each tab shows first, so switching tabs is instant.
+  void _warmTabs() {
+    final me = ref.read(sessionProvider).value;
+    for (final path in [
+      '/deck?sport=all&limit=12',
+      '/deck?sport=nba&limit=12',
+      '/deck?sport=nfl&limit=12',
+      '/contests/current',
+      '/me/picks?status=pending',
+      '/friends',
+      '/friend-requests',
+      '/leagues',
+      '/threads',
+      '/me/collection',
+      '/analyst/suggestions',
+      if (me != null) '/profiles/${me.id}/stats',
+    ]) {
+      api.prefetch(path);
+    }
+  }
+
+  void _goBranch(int i) {
+    ref.read(immersiveProvider.notifier).set(false);
+    if (i != widget.shell.currentIndex) _tabFade.forward(from: 0);
+    widget.shell.goBranch(i, initialLocation: i == widget.shell.currentIndex);
   }
 
   @override
   void dispose() {
+    _tabFade.dispose();
     _life.dispose();
     _events?.cancel();
     _poll?.cancel();
@@ -180,15 +246,28 @@ class _AppShellState extends ConsumerState<AppShell> {
       (Icons.chat_outlined, 'AI'),
       (Icons.person_outline, 'Profile'),
     ];
+    final immersive = ref.watch(immersiveProvider) && widget.shell.currentIndex == 0;
     return Scaffold(
       body: SafeArea(
         bottom: false,
         child: Column(children: [
           const AppHeader(),
-          Expanded(child: widget.shell),
+          Expanded(
+            child: FadeTransition(
+              opacity: CurvedAnimation(parent: _tabFade, curve: Curves.easeOut),
+              child: SlideTransition(
+                position: Tween(begin: const Offset(0, 0.012), end: Offset.zero)
+                    .animate(CurvedAnimation(parent: _tabFade, curve: Curves.easeOutCubic)),
+                child: widget.shell,
+              ),
+            ),
+          ),
         ]),
       ),
-      bottomNavigationBar: Container(
+      bottomNavigationBar: Collapse(
+        visible: !immersive,
+        alignment: Alignment.bottomCenter,
+        child: Container(
         decoration: const BoxDecoration(color: C.bg, border: Border(top: BorderSide(color: C.line))),
         child: SafeArea(
           top: false,
@@ -198,7 +277,7 @@ class _AppShellState extends ConsumerState<AppShell> {
               for (var i = 0; i < items.length; i++)
                 Expanded(
                   child: InkWell(
-                    onTap: () => widget.shell.goBranch(i, initialLocation: i == widget.shell.currentIndex),
+                    onTap: () => _goBranch(i),
                     child: Semantics(
                       selected: i == widget.shell.currentIndex,
                       label: i == 1 && badge > 0 ? '${items[i].$2}, $badge pending' : items[i].$2,
@@ -232,6 +311,7 @@ class _AppShellState extends ConsumerState<AppShell> {
             ]),
           ),
         ),
+      ),
       ),
     );
   }

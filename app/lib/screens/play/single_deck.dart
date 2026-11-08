@@ -10,6 +10,7 @@ import '../../core/api.dart';
 import '../../core/format.dart' as f;
 import '../../core/payout.dart';
 import '../../core/theme.dart';
+import '../../state/immersive.dart';
 import '../../state/pick_queue.dart';
 import '../../ui/swipe.dart';
 import '../../ui/widgets.dart';
@@ -29,31 +30,54 @@ class SingleDeck extends ConsumerStatefulWidget {
 }
 
 class _SingleDeckState extends ConsumerState<SingleDeck> {
-  late Future<List<PlayableCard>> _deck = loadDeck(widget.sport);
-  int _index = 0;
+  /// Cards still to play, top first. Skipping sends the top card to the back.
+  List<PlayableCard>? _queue;
+  Object? _error;
   final _stakes = <int, int>{};
+  final _swipe = GlobalKey<SwipeableState>();
 
   /// Command ids locked from this deck, in card order.
   final _locked = <String>[];
 
-  void _reload() => setState(() {
-        _deck = loadDeck(widget.sport);
-        _index = 0;
-        _stakes.clear();
-        _locked.clear();
+  @override
+  void initState() {
+    super.initState();
+    _reload();
+  }
+
+  Future<void> _reload() async {
+    setState(() {
+      _queue = null;
+      _error = null;
+      _stakes.clear();
+      _locked.clear();
+    });
+    try {
+      final cards = await loadDeck(widget.sport, limit: 12);
+      if (mounted) setState(() => _queue = cards);
+    } catch (e) {
+      if (mounted) setState(() => _error = e);
+    }
+  }
+
+  void _immersive(bool on) => ref.read(immersiveProvider.notifier).set(on);
+
+  void _skip() => setState(() {
+        final q = _queue!;
+        if (q.length > 1) q.add(q.removeAt(0));
       });
 
-  Future<void> _choose(List<PlayableCard> cards, String side) async {
-    final card = cards[_index];
+  Future<void> _choose(String side) async {
+    final card = _queue!.first;
     final stake = _stakes[card.market.marketId] ?? 0;
     if (stake > 0) {
       final ok = await _confirm(card, side, stake);
       if (ok != true || !mounted) return;
     }
-    _lock(cards, card, side, stake);
+    _lock(card, side, stake);
   }
 
-  void _lock(List<PlayableCard> cards, PlayableCard card, String side, int stake) {
+  void _lock(PlayableCard card, String side, int stake) {
     final q = ref.read(pickQueueProvider.notifier);
     final lineText = '${f.cap(side)} ${f.line(card.market.line)}';
     final id = q.add(
@@ -62,12 +86,14 @@ class _SingleDeckState extends ConsumerState<SingleDeck> {
       stake: stake,
       label: '${card.card.fullName} · $lineText ${card.market.statLabel.toLowerCase()}',
     );
-    final at = _index;
     setState(() {
       _locked.add(id);
-      _index++;
+      _queue!.remove(card);
     });
-    if (_index >= cards.length) q.flush();
+    if (_queue!.isEmpty) {
+      q.flush();
+      _immersive(false);
+    }
     toast(
       context,
       stake > 0 ? '${f.coins(stake)} coins · $lineText locked.' : '$lineText locked.',
@@ -77,7 +103,7 @@ class _SingleDeckState extends ConsumerState<SingleDeck> {
         if (q.undo(id) && mounted) {
           setState(() {
             _locked.remove(id);
-            _index = at;
+            _queue!.insert(0, card);
           });
         }
       },
@@ -123,45 +149,62 @@ class _SingleDeckState extends ConsumerState<SingleDeck> {
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<List<PlayableCard>>(
-      future: _deck,
-      builder: (context, snap) {
-        if (snap.hasError) return ErrorText(snap.error!, onRetry: _reload);
-        if (!snap.hasData) return const Loading();
-        final cards = snap.data!;
-        if (cards.isEmpty) {
-          return ListView(padding: const EdgeInsets.symmetric(horizontal: 20), children: [
-            EmptyState(
-              icon: Icons.event_busy_outlined,
-              title: 'No open lines right now',
-              body: 'New lines open before each NFL and NBA game. Check back closer to tip-off or kickoff.',
-              action: PrimaryButton('Refresh', onPressed: _reload),
-            ),
-          ]);
-        }
-        if (_index >= cards.length) return _complete(cards.length);
-        return _deckView(cards);
-      },
+    final Widget view;
+    if (_error != null) {
+      view = ErrorText(_error!, onRetry: _reload);
+    } else if (_queue == null) {
+      view = const Loading.card();
+    } else if (_queue!.isEmpty && _locked.isEmpty) {
+      view = ListView(padding: const EdgeInsets.symmetric(horizontal: 20), children: [
+        EmptyState(
+          icon: Icons.event_busy_outlined,
+          title: 'No open lines right now',
+          body: 'New lines open before each NFL and NBA game. Check back closer to tip-off or kickoff.',
+          action: PrimaryButton('Refresh', onPressed: _reload),
+        ),
+      ]);
+    } else if (_queue!.isEmpty) {
+      view = _complete(_locked.length);
+    } else {
+      view = _deckView();
+    }
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 220),
+      switchInCurve: Curves.easeOutCubic,
+      child: KeyedSubtree(key: ValueKey(view.runtimeType), child: view),
     );
   }
 
-  Widget _deckView(List<PlayableCard> cards) {
-    final card = cards[_index];
+  Widget _deckView() {
+    final q = _queue!;
+    final immersive = ref.watch(immersiveProvider);
+    return Column(children: [
+      Expanded(
+        child: CardStage(
+          swipeKey: _swipe,
+          topId: q.first.market.marketId,
+          top: _card(q.first, q.length),
+          next: q.length > 1 ? _card(q[1], q.length - 1) : null,
+          onSwipe: _choose,
+          onSkip: _skip,
+          onEngage: () => _immersive(true),
+          onPullDown: () => _immersive(false),
+        ),
+      ),
+      SwipeButtons(swipe: _swipe, hint: immersive ? null : 'Swipe up to skip · pull down for the menu'),
+      SizedBox(height: immersive ? 12 : 4),
+    ]);
+  }
+
+  Widget _card(PlayableCard card, int left) {
     final balance = math.max(0, ref.watch(displayBalanceProvider));
     final stake = math.min(_stakes[card.market.marketId] ?? 0, balance);
     final ret = singleReturn(stake);
-    return LayoutBuilder(builder: (context, c) {
-      final width = math.min(c.maxWidth - 40, 360.0);
-      return ListView(padding: const EdgeInsets.fromLTRB(20, 14, 20, 24), children: [
-        Center(
-          child: Swipeable(
-            key: ValueKey(card.market.marketId),
-            onSwipe: (side) => _choose(cards, side),
-            child: SportCard(
+    return SportCard(
               spec: card.card,
               market: card.market,
-              width: width,
-              topRight: '${f.two(_index + 1)} / ${f.two(cards.length)}',
+              width: 340,
+              topRight: '$left LEFT',
               body: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                 Container(height: 1, color: const Color(0xFFCBD3DB), margin: const EdgeInsets.only(top: 8, bottom: 10)),
                 Row(children: [
@@ -203,15 +246,7 @@ class _SingleDeckState extends ConsumerState<SingleDeck> {
                     ? 'Diamond earned'
                     : 'Earn ${f.cap(card.mastery.nextTier!)}: ${card.mastery.count}/${card.mastery.nextAt}',
               ),
-            ),
-          ),
-        ),
-        SwipeButtons(
-          onSide: (side) => _choose(cards, side),
-          onSkip: () => setState(() => _index++),
-        ),
-      ]);
-    });
+            );
   }
 
   Widget _complete(int total) {

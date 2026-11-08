@@ -9,6 +9,7 @@ import '../../card/sport_card.dart';
 import '../../core/format.dart' as f;
 import '../../core/payout.dart';
 import '../../core/theme.dart';
+import '../../state/immersive.dart';
 import '../../state/pick_queue.dart';
 import '../../ui/swipe.dart';
 import '../../ui/widgets.dart';
@@ -29,8 +30,10 @@ class ParlayDeck extends ConsumerStatefulWidget {
 }
 
 class _ParlayDeckState extends ConsumerState<ParlayDeck> {
-  late Future<List<PlayableCard>> _deck = loadDeck(widget.sport, limit: 20);
-  int _index = 0;
+  /// Cards not in the draft, top first. Skipping sends the top card to the back.
+  List<PlayableCard>? _queue;
+  Object? _error;
+  final _swipe = GlobalKey<SwipeableState>();
   var _legs = <Leg>[];
   int _stake = 0;
   String? _pendingId;
@@ -43,7 +46,28 @@ class _ParlayDeckState extends ConsumerState<ParlayDeck> {
   void initState() {
     super.initState();
     _sub = ref.read(pickQueueProvider.notifier).events.listen(_onEvent);
+    _reload();
   }
+
+  Future<void> _reload() async {
+    setState(() {
+      _queue = null;
+      _error = null;
+    });
+    try {
+      final cards = await loadDeck(widget.sport, limit: 20);
+      if (mounted) setState(() => _queue = cards.where((c) => !_inDraft(c)).toList());
+    } catch (e) {
+      if (mounted) setState(() => _error = e);
+    }
+  }
+
+  void _immersive(bool on) => ref.read(immersiveProvider.notifier).set(on);
+
+  void _skip() => setState(() {
+        final q = _queue!;
+        if (q.length > 1) q.add(q.removeAt(0));
+      });
 
   @override
   void dispose() {
@@ -66,12 +90,10 @@ class _ParlayDeckState extends ConsumerState<ParlayDeck> {
     });
   }
 
-  void _add(List<PlayableCard> cards, String side) {
+  void _add(String side) {
     if (_legs.length >= maxLegs) return;
-    setState(() {
-      _legs.add(Leg(cards[_index], side));
-      _index++;
-    });
+    setState(() => _legs.add(Leg(_queue!.removeAt(0), side)));
+    if (_legs.length >= maxLegs || _queue!.isEmpty) _immersive(false);
   }
 
   bool _inDraft(PlayableCard c) => _legs.any((l) => l.card.market.marketId == c.market.marketId);
@@ -110,7 +132,10 @@ class _ParlayDeckState extends ConsumerState<ParlayDeck> {
                   IconButton(
                     tooltip: 'Remove ${l.card.card.fullName}',
                     onPressed: () {
-                      update(() => _legs.remove(l));
+                      update(() {
+                        _legs.remove(l);
+                        _queue?.add(l.card);
+                      });
                       if (_legs.length < 2) Navigator.pop(ctx, false);
                     },
                     icon: const Icon(Icons.close, color: C.dim),
@@ -219,31 +244,31 @@ class _ParlayDeckState extends ConsumerState<ParlayDeck> {
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<List<PlayableCard>>(
-      future: _deck,
-      builder: (context, snap) {
-        if (snap.hasError) return ErrorText(snap.error!, onRetry: () => setState(() => _deck = loadDeck(widget.sport, limit: 20)));
-        if (!snap.hasData) return const Loading();
-        final cards = snap.data!;
-        while (_index < cards.length && _inDraft(cards[_index])) {
-          _index++;
-        }
-        final n = _legs.length;
-        final full = n >= maxLegs;
-        final done = _index >= cards.length;
-        return Column(children: [
-          Expanded(
-            child: LayoutBuilder(builder: (context, c) {
-              final width = math.min(c.maxWidth - 40, 360.0);
-              return ListView(padding: const EdgeInsets.fromLTRB(20, 4, 20, 16), children: [
-                Row(children: [
-                  Text('$n ${n == 1 ? 'leg' : 'legs'} added', style: T.h3.copyWith(fontSize: 15)),
-                  const Spacer(),
-                  const Text('All legs must hit', style: T.small),
-                ]),
-                _slots(),
-                const SizedBox(height: 14),
-                if (full || done)
+    if (_error != null) return ErrorText(_error!, onRetry: _reload);
+    if (_queue == null) return const Loading.card();
+    final queue = _queue!;
+    final immersive = ref.watch(immersiveProvider);
+    final n = _legs.length;
+    final full = n >= maxLegs;
+    final done = queue.isEmpty;
+    return Column(children: [
+      Collapse(
+        visible: !immersive,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
+          child: Row(children: [
+            Text('$n ${n == 1 ? 'leg' : 'legs'} added', style: T.h3.copyWith(fontSize: 15)),
+            const Spacer(),
+            const Text('All legs must hit', style: T.small),
+          ]),
+        ),
+      ),
+      Padding(padding: const EdgeInsets.symmetric(horizontal: 20), child: _slots()),
+      Expanded(
+        child: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 220),
+          child: (full || done)
+              ? ListView(key: const ValueKey('end'), padding: const EdgeInsets.fromLTRB(20, 4, 20, 16), children: [
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 24),
                     child: Column(children: [
@@ -258,62 +283,65 @@ class _ParlayDeckState extends ConsumerState<ParlayDeck> {
                         style: T.dim,
                         textAlign: TextAlign.center,
                       ),
-                      if (done && !full)
-                        GhostButton('Load more cards', color: C.green, onPressed: () => setState(() {
-                              _deck = loadDeck(widget.sport, limit: 20);
-                              _index = 0;
-                            })),
+                      if (done && !full) GhostButton('Load more cards', color: C.green, onPressed: _reload),
                     ]),
-                  )
-                else ...[
-                  Center(
-                    child: Swipeable(
-                      key: ValueKey(cards[_index].market.marketId),
-                      onSwipe: (side) => _add(cards, side),
-                      child: SportCard(
-                        spec: cards[_index].card,
-                        market: cards[_index].market,
-                        width: width,
-                        topRight: '${f.two(_index + 1)} / ${f.two(cards.length)}',
-                        body: Column(children: [
-                          Container(height: 1, color: const Color(0xFFCBD3DB), margin: const EdgeInsets.only(top: 8)),
-                          RecentForm(values: cards[_index].recentForm, statLabel: cards[_index].market.statLabel.toLowerCase()),
-                          CommunityBar(overPct: cards[_index].market.overPct, total: cards[_index].market.communityTotal),
-                        ]),
-                        footer: CardFooter(
-                          spec: cards[_index].card,
-                          left: '${cards[_index].mastery.displayTier.toUpperCase()} / ${f.two(cards[_index].card.cardNo)}',
-                          right: cards[_index].mastery.nextTier == null
-                              ? 'Diamond earned'
-                              : 'Earn ${f.cap(cards[_index].mastery.nextTier!)}: ${cards[_index].mastery.count}/${cards[_index].mastery.nextAt}',
-                        ),
-                      ),
+                  ),
+                ])
+              : Column(key: const ValueKey('deck'), children: [
+                  Expanded(
+                    child: CardStage(
+                      swipeKey: _swipe,
+                      topId: queue.first.market.marketId,
+                      top: _card(queue.first, queue.length),
+                      next: queue.length > 1 ? _card(queue[1], queue.length - 1) : null,
+                      onSwipe: _add,
+                      onSkip: _skip,
+                      onEngage: () => _immersive(true),
+                      onPullDown: () => _immersive(false),
                     ),
                   ),
-                  SwipeButtons(hint: 'Swipe to add', onSide: (s) => _add(cards, s), onSkip: () => setState(() => _index++)),
-                ],
-              ]);
-            }),
-          ),
-          Container(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
-            decoration: const BoxDecoration(border: Border(top: BorderSide(color: C.line))),
-            child: Column(children: [
-              Row(children: [
-                Text('$n ${n == 1 ? 'leg' : 'legs'} selected', style: const TextStyle(fontWeight: FontWeight.w600)),
-                const Spacer(),
-                Text(n >= 2 ? '${parlayMultiplier(n)}× wager + ${legBonus * n} coins' : '2–5 legs · one entry',
-                    style: const TextStyle(fontWeight: FontWeight.w600, color: C.dim)),
-              ]),
-              const SizedBox(height: 10),
-              PrimaryButton(
-                n >= 2 ? 'Review parlay' : 'Add ${2 - n} more ${2 - n == 1 ? 'leg' : 'legs'}',
-                onPressed: n >= 2 ? _review : null,
-              ),
+                  SwipeButtons(swipe: _swipe, hint: immersive ? null : 'Swipe to add a leg · up to skip'),
+                ]),
+        ),
+      ),
+      Collapse(
+        visible: !immersive || n >= 2 || full || done,
+        alignment: Alignment.bottomCenter,
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+          decoration: const BoxDecoration(border: Border(top: BorderSide(color: C.line))),
+          child: Column(children: [
+            Row(children: [
+              Text('$n ${n == 1 ? 'leg' : 'legs'} selected', style: const TextStyle(fontWeight: FontWeight.w600)),
+              const Spacer(),
+              Text(n >= 2 ? '${parlayMultiplier(n)}× wager + ${legBonus * n} coins' : '2–5 legs · one entry',
+                  style: const TextStyle(fontWeight: FontWeight.w600, color: C.dim)),
             ]),
-          ),
-        ]);
-      },
-    );
+            const SizedBox(height: 10),
+            PrimaryButton(
+              n >= 2 ? 'Review parlay' : 'Add ${2 - n} more ${2 - n == 1 ? 'leg' : 'legs'}',
+              onPressed: n >= 2 ? _review : null,
+            ),
+          ]),
+        ),
+      ),
+    ]);
   }
+
+  Widget _card(PlayableCard c, int left) => SportCard(
+        spec: c.card,
+        market: c.market,
+        width: 340,
+        topRight: '$left LEFT',
+        body: Column(children: [
+          Container(height: 1, color: const Color(0xFFCBD3DB), margin: const EdgeInsets.only(top: 8)),
+          RecentForm(values: c.recentForm, statLabel: c.market.statLabel.toLowerCase()),
+          CommunityBar(overPct: c.market.overPct, total: c.market.communityTotal),
+        ]),
+        footer: CardFooter(
+          spec: c.card,
+          left: '${c.mastery.displayTier.toUpperCase()} / ${f.two(c.card.cardNo)}',
+          right: c.mastery.nextTier == null ? 'Diamond earned' : 'Earn ${f.cap(c.mastery.nextTier!)}: ${c.mastery.count}/${c.mastery.nextAt}',
+        ),
+      );
 }

@@ -51,6 +51,7 @@ class Api {
   }
 
   Future<void> setToken(String? token) async {
+    _warm.clear();
     if (kIsWeb) return;
     _token = token;
     final prefs = await SharedPreferences.getInstance();
@@ -69,6 +70,7 @@ class Api {
   /// Returns the raw status and body. Network failures become status 0.
   Future<ApiResponse> raw(String method, String path, {Object? body, Duration timeout = const Duration(seconds: 12)}) async {
     final uri = Uri.parse('$base/v1$path');
+    if (method != 'GET') _warm.clear();
     try {
       final req = http.Request(method, uri)..headers.addAll(_headers);
       if (body != null) req.body = jsonEncode(body);
@@ -90,7 +92,22 @@ class Api {
     throw ApiException(r.status, m['code']?.toString() ?? 'error', m['message']?.toString() ?? 'Something went wrong.', m);
   }
 
-  Future<Map<String, dynamic>> get(String path) => json('GET', path);
+  final Map<String, (DateTime, Future<ApiResponse>)> _warm = {};
+
+  /// Starts a GET in the background; the next [get] of the same path within
+  /// a minute reuses it instead of hitting the network again.
+  void prefetch(String path) {
+    _warm[path] = (DateTime.now(), raw('GET', path));
+  }
+
+  Future<Map<String, dynamic>> get(String path) async {
+    final hit = _warm.remove(path);
+    if (hit != null && DateTime.now().difference(hit.$1) < const Duration(seconds: 60)) {
+      final r = await hit.$2;
+      if (r.ok) return r.map;
+    }
+    return json('GET', path);
+  }
   Future<Map<String, dynamic>> post(String path, [Object? body]) => json('POST', path, body: body ?? {});
   Future<Map<String, dynamic>> patch(String path, Object body) => json('PATCH', path, body: body);
 }

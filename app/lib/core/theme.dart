@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart' show CupertinoPageTransitionsBuilder;
 import 'package:flutter/material.dart';
 
 class C {
@@ -31,6 +32,13 @@ ThemeData buildTheme() {
   );
   return base.copyWith(
     textTheme: base.textTheme.apply(bodyColor: C.text, displayColor: C.text),
+    pageTransitionsTheme: const PageTransitionsTheme(builders: {
+      TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+      TargetPlatform.android: CupertinoPageTransitionsBuilder(),
+      TargetPlatform.macOS: CupertinoPageTransitionsBuilder(),
+      TargetPlatform.windows: CupertinoPageTransitionsBuilder(),
+      TargetPlatform.linux: CupertinoPageTransitionsBuilder(),
+    }),
     inputDecorationTheme: const InputDecorationTheme(
       border: UnderlineInputBorder(borderSide: BorderSide(color: C.line)),
       enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: C.line)),

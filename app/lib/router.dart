@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import 'core/theme.dart';
 import 'screens/ai_screen.dart';
 import 'screens/auth_screen.dart';
 import 'screens/invite_screen.dart';
@@ -42,7 +41,7 @@ final router = GoRouter(
     GoRoute(path: '/', redirect: (_, _) => '/play'),
     GoRoute(
       path: '/loading',
-      builder: (_, _) => const Scaffold(body: Center(child: CircularProgressIndicator(color: C.green, strokeWidth: 2))),
+      builder: (_, _) => const Scaffold(),
     ),
     GoRoute(path: '/login', builder: (_, s) => AuthScreen(next: s.uri.queryParameters['next'])),
     GoRoute(path: '/invite/:token', builder: (_, s) => InviteScreen(token: s.pathParameters['token']!)),

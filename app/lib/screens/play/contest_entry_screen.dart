@@ -45,6 +45,7 @@ class _ContestEntryScreenState extends ConsumerState<ContestEntryScreen> {
   String? _commandId;
   bool _busy = false;
   final _tiebreak = TextEditingController();
+  final _swipe = GlobalKey<SwipeableState>();
 
   String get _draftKey => 'ss.contest.${ref.read(sessionProvider).value?.id}.${widget.dayId}';
 
@@ -203,8 +204,10 @@ class _ContestEntryScreenState extends ConsumerState<ContestEntryScreen> {
       LayoutBuilder(builder: (context, c) {
         return Center(
           child: Swipeable(
-            key: ValueKey(q.id),
+            key: _swipe,
             onSwipe: _answer,
+            onSkip: () => setState(() => _cursor = (_cursor + 1) % _qs.length),
+            verticalDrag: false,
             child: SportCard(
               spec: q.card.card,
               market: q.card.market,
@@ -220,9 +223,7 @@ class _ContestEntryScreenState extends ConsumerState<ContestEntryScreen> {
           ),
         );
       }),
-      SwipeButtons(hint: 'Swipe to choose', onSide: _answer, onSkip: () {
-        setState(() => _cursor = (_cursor + 1) % _qs.length);
-      }),
+      SwipeButtons(swipe: _swipe, hint: 'Swipe to choose'),
       if (_answers.isNotEmpty) Align(alignment: Alignment.centerRight, child: ArrowLink('Review draft', onTap: () => setState(() => _reviewing = true))),
       const SizedBox(height: 10),
       const Text('Arrow keys work when the card is focused. No coin wager. Submit after reviewing every prediction.', style: T.dim),

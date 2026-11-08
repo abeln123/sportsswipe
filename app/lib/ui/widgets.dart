@@ -382,11 +382,123 @@ class Labeled extends StatelessWidget {
       ]);
 }
 
+/// Placeholder shown while a screen loads: the rough shape of the content
+/// with a moving sheen, instead of a spinner.
 class Loading extends StatelessWidget {
-  const Loading({super.key});
+  const Loading({super.key}) : card = false;
+  const Loading.card({super.key}) : card = true;
+  final bool card;
+
   @override
-  Widget build(BuildContext context) =>
-      const Padding(padding: EdgeInsets.all(40), child: Center(child: CircularProgressIndicator(color: C.green, strokeWidth: 2)));
+  Widget build(BuildContext context) {
+    if (card) {
+      return Shimmer(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+          child: Column(children: [
+            Expanded(child: Center(child: AspectRatio(aspectRatio: 0.62, child: Container(decoration: _block(18))))),
+            const SizedBox(height: 18),
+            Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+              for (var i = 0; i < 3; i++)
+                Container(width: 56, height: 56, margin: const EdgeInsets.symmetric(horizontal: 14), decoration: _block(28)),
+            ]),
+          ]),
+        ),
+      );
+    }
+    return Shimmer(
+      child: ListView(
+        physics: const NeverScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
+        children: [
+          FractionallySizedBox(alignment: Alignment.centerLeft, widthFactor: 0.45, child: Container(height: 26, decoration: _block(6))),
+          const SizedBox(height: 10),
+          FractionallySizedBox(alignment: Alignment.centerLeft, widthFactor: 0.7, child: Container(height: 14, decoration: _block(4))),
+          const SizedBox(height: 24),
+          for (var i = 0; i < 5; i++) ...[
+            Row(children: [
+              Container(width: 40, height: 40, decoration: _block(20)),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  FractionallySizedBox(widthFactor: i.isEven ? 0.6 : 0.45, child: Container(height: 13, decoration: _block(4))),
+                  const SizedBox(height: 8),
+                  FractionallySizedBox(widthFactor: i.isEven ? 0.35 : 0.5, child: Container(height: 11, decoration: _block(4))),
+                ]),
+              ),
+            ]),
+            const SizedBox(height: 22),
+          ],
+        ],
+      ),
+    );
+  }
+
+  static BoxDecoration _block(double r) => BoxDecoration(color: C.surface, borderRadius: BorderRadius.circular(r));
+}
+
+/// Sweeps a soft highlight across its child, for skeleton placeholders.
+class Shimmer extends StatefulWidget {
+  const Shimmer({super.key, required this.child});
+  final Widget child;
+
+  @override
+  State<Shimmer> createState() => _ShimmerState();
+}
+
+class _ShimmerState extends State<Shimmer> with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 1300))..repeat();
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => ExcludeSemantics(
+        child: AnimatedBuilder(
+          animation: _c,
+          child: widget.child,
+          builder: (context, child) => ShaderMask(
+            blendMode: BlendMode.srcATop,
+            shaderCallback: (r) {
+              final x = -1.0 + 3.0 * _c.value;
+              return LinearGradient(
+                begin: Alignment(x - 1, -0.3),
+                end: Alignment(x, 0.3),
+                colors: const [Color(0x00FFFFFF), Color(0x14FFFFFF), Color(0x00FFFFFF)],
+              ).createShader(r);
+            },
+            child: child,
+          ),
+        ),
+      );
+}
+
+/// Folds a bar away (height and opacity) when [visible] turns false.
+class Collapse extends StatelessWidget {
+  const Collapse({super.key, required this.visible, required this.child, this.alignment = Alignment.topCenter});
+  final bool visible;
+  final Widget child;
+  final Alignment alignment;
+
+  @override
+  Widget build(BuildContext context) => TweenAnimationBuilder<double>(
+        tween: Tween(end: visible ? 1 : 0),
+        duration: const Duration(milliseconds: 280),
+        curve: Curves.easeOutCubic,
+        child: child,
+        builder: (context, t, child) => t == 0
+            ? const SizedBox.shrink()
+            : ClipRect(
+                child: Align(
+                  alignment: alignment,
+                  heightFactor: t,
+                  child: Opacity(opacity: t, child: IgnorePointer(ignoring: !visible, child: child)),
+                ),
+              ),
+      );
 }
 
 class ErrorText extends StatelessWidget {
