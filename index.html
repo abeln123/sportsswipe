@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sports Swipe — NFL &amp; NBA Player Line Cards, Parlays, Contests &amp; On-Chain Collectibles</title>
+  <meta name="description" content="Swipe Over or Under on real NFL and NBA player lines, build up to 12x parlays, compete in weekly contests and 10-card head-to-head duels, level up Chrome Sport card tiers, and trade numbered Diamond editions on Solana.">
+  <meta name="theme-color" content="#0A1A16">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <div class="pine-backdrop" aria-hidden="true"></div>
+
+  <!-- Top Navigation modeled directly on AppHeader + UnderTabs -->
+  <header class="site-header">
+    <div class="container header-inner">
+      <a href="#top" class="brand" id="nav-brand">
+        <span class="brand-mark"></span>
+        <span class="brand-name">Sports Swipe</span>
+      </a>
+
+      <nav class="under-tabs" aria-label="Feature sections">
+        <a href="#swiping" class="under-tab active" id="nav-swiping">Swiping &amp; Packs</a>
+        <a href="#parlays" class="under-tab" id="nav-parlays">Parlays</a>
+        <a href="#contests" class="under-tab" id="nav-contests">Contests &amp; Duels</a>
+        <a href="#tiers" class="under-tab" id="nav-tiers">Card Tiers</a>
+        <a href="#blockchain" class="under-tab" id="nav-blockchain">Blockchain</a>
+      </nav>
+
+      <div class="header-balance" aria-label="Practice coin balance">
+        <span class="coin-glyph">C</span>
+        <span id="header-coin-balance">1,250</span>
+        <span style="color:var(--dim);font-weight:500">coins</span>
+      </div>
+    </div>
+  </header>
+
+  <main id="top" class="container">
+    <!-- HERO + INTERACTIVE SWIPE DECK -->
+    <section class="hero-section">
+      <div class="hero-grid">
+        <div class="hero-copy">
+          <p class="t-label">NFL &amp; NBA PLAYER &amp; GAME LINES</p>
+          <h1 class="t-h1">Make the call in a single swipe.</h1>
+          <p class="t-body">
+            Rip daily and team foil packs, swipe right for Over or left for Under on live ESPN player props, stack multi-leg parlays, challenge friends to 10-card head-to-heads, and unlock numbered Diamond cards you can trade on Solana.
+          </p>
+          <div class="hero-actions">
+            <a href="#parlays" class="btn-primary" id="cta-build-parlay">Build a Parlay</a>
+            <a href="#blockchain" class="btn-ghost" id="cta-diamond-chain">On-Chain Diamond Cards</a>
+          </div>
+          <div class="hero-metrics">
+            <div class="metric-item">
+              <div class="metric-label">Parlay multiplier</div>
+              <div class="metric-value">12×<span>on 5 picks</span></div>
+            </div>
+            <div class="metric-item">
+              <div class="metric-label">Weekly contest</div>
+              <div class="metric-value">$1,500<span>prize pool</span></div>
+            </div>
+            <div class="metric-item">
+              <div class="metric-label">Diamond mastery</div>
+              <div class="metric-value">400<span>correct calls</span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Live Interactive Phone Frame from shell.dart & play_screen.dart -->
+        <div class="phone-stage">
+          <div class="app-frame" id="interactive-phone-frame">
+            <div class="app-frame-Pine">
+              <div class="frame-status">
+                <span>9:41</span>
+                <div class="frame-island"></div>
+                <span style="font-size:12px">5G</span>
+              </div>
+
+              <div class="frame-header">
+                <span class="frame-header-title">Play</span>
+                <div style="display:inline-flex;align-items:center;gap:6px;font-size:13.5px;font-weight:700">
+                  <span class="coin-glyph">C</span>
+                  <span id="frame-coin-balance">1,250</span>
+                </div>
+              </div>
+
+              <div class="frame-subnav">
+                <div class="frame-subnav-group">
+                  <span class="frame-tab active">Packs</span>
+                  <a href="#parlays" class="frame-tab" style="text-decoration:none">Parlays</a>
+                  <a href="#contests" class="frame-tab" style="text-decoration:none">Contests</a>
+                </div>
+                <div class="frame-subnav-group">
+                  <button type="button" class="frame-tab active" data-sport-filter="all" id="filter-all">All sports</button>
+                  <button type="button" class="frame-tab" data-sport-filter="nfl" id="filter-nfl">NFL</button>
+                  <button type="button" class="frame-tab" data-sport-filter="nba" id="filter-nba">NBA</button>
+                </div>
+              </div>
+
+              <div class="deck-callouts">
+                <span class="callout-under">← SWIPE LEFT · UNDER</span>
+                <span class="callout-over">SWIPE RIGHT · OVER →</span>
+              </div>
+
+              <div class="card-stack-wrap" id="hero-card-mount"></div>
+
+              <div class="deck-controls">
+                <div class="wager-control" aria-label="Coin wager control">
+                  <button type="button" class="wager-btn" id="wager-minus" aria-label="Decrease wager by 25">−</button>
+                  <div class="wager-readout">
+                    <strong id="deck-wager-val">50</strong>
+                    <span>coins</span>
+                  </div>
+                  <button type="button" class="wager-btn" id="wager-plus" aria-label="Increase wager by 25">+</button>
+                </div>
+
+                <div class="swipe-action-btns">
+                  <button type="button" class="btn-swipe-under" id="btn-swipe-under">← Under</button>
+                  <button type="button" class="btn-swipe-skip" id="btn-swipe-skip">Skip</button>
+                  <button type="button" class="btn-swipe-over" id="btn-swipe-over">Over →</button>
+                </div>
+              </div>
+
+              <div class="swipe-receipt" id="swipe-receipt">Drag the Chrome Sport card or tap Over / Under</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <hr class="hr">
+
+    <!-- 1. SWIPING & FOIL PACK STORE -->
+    <section id="swiping" class="feature-section">
+      <div class="section-head">
+        <p class="t-label">01 · FOIL PACKS &amp; CARD DECK</p>
+        <h2 class="t-h2">Rip foil packs. Call five live markets per pack.</h2>
+        <p class="t-body">
+          Every pack draws five unique, unplayed player or game markets from the live ESPN slate. Tear the foil seal across the top, call Over or Under with optional coin stakes, or send tough lines to Leftovers to revisit before lock.
+        </p>
+      </div>
+
+      <div class="packs-row">
+        <div class="foil-pack-item">
+          <div class="foil-wrapper" style="background:linear-gradient(155deg, #1E7E48 0%, #0D3822 55%, #29A35E 100%)">
+            <div class="foil-crimp"></div>
+            <div class="foil-title">DAILY<br>SLATE</div>
+            <div class="foil-sub">5 cards per pack</div>
+            <div class="foil-crimp"></div>
+          </div>
+          <div class="pack-meta-title">10-Coin Daily Pack</div>
+          <div class="pack-meta-price">10 coins · Mixed NFL &amp; NBA</div>
+        </div>
+
+        <div class="foil-pack-item">
+          <div class="foil-wrapper" style="background:linear-gradient(155deg, #00338D 0%, #0A1D42 55%, #C60C30 100%)">
+            <div class="foil-crimp"></div>
+            <div class="foil-title">TEAM<br>SERIES</div>
+            <div class="foil-sub">5 team markets</div>
+            <div class="foil-crimp"></div>
+          </div>
+          <div class="pack-meta-title">50-Coin Team Packs</div>
+          <div class="pack-meta-price">50 coins · Every NFL &amp; NBA roster</div>
+        </div>
+
+        <div class="foil-pack-item">
+          <div class="foil-wrapper" style="background:linear-gradient(155deg, #8B6514 0%, #382706 55%, #D9A436 100%)">
+            <div class="foil-crimp"></div>
+            <span class="foil-badge">3X</span>
+            <div class="foil-title">SHARP<br>CHALLENGE</div>
+            <div class="foil-sub">Hit target accuracy</div>
+            <div class="foil-crimp"></div>
+          </div>
+          <div class="pack-meta-title">Challenge Packs</div>
+          <div class="pack-meta-price">Hit target % for 2×–3× bonus</div>
+        </div>
+
+        <div class="foil-pack-item">
+          <div class="foil-wrapper" style="background:linear-gradient(155deg, #27423B 0%, #11211D 55%, #3B6156 100%)">
+            <div class="foil-crimp"></div>
+            <div class="foil-title">OPEN<br>LEFTOVERS</div>
+            <div class="foil-sub">Saved unplayed cards</div>
+            <div class="foil-crimp"></div>
+          </div>
+          <div class="pack-meta-title">Leftover Stack</div>
+          <div class="pack-meta-price">Free · Resume any skipped cards</div>
+        </div>
+      </div>
+    </section>
+
+    <hr class="hr">
+
+    <!-- 2. PARLAY DECK & MULTIPLIER BUILDER -->
+    <section id="parlays" class="feature-section">
+      <div class="split-showcase">
+        <div>
+          <div class="section-head" style="margin-bottom:20px">
+            <p class="t-label">02 · PARLAY DECK</p>
+            <h2 class="t-h2">Stack 2 to 5 picks for up to a 12× return.</h2>
+            <p class="t-body">
+              Swipe right or left in the Parlay tab to draft up to five legs across NFL and NBA markets. Every leg adds a +25 coin leg bonus on top of the parlay multiplier, and if a game locks while you build, only the stale leg is removed—your draft stays intact.
+            </p>
+          </div>
+
+          <div class="multiplier-scale" role="group" aria-label="Select parlay leg count">
+            <button type="button" class="mult-step" data-mult-legs="2" id="mult-btn-2">
+              <strong>3×</strong>
+              <span>2 Picks</span>
+            </button>
+            <button type="button" class="mult-step" data-mult-legs="3" id="mult-btn-3">
+              <strong>5×</strong>
+              <span>3 Picks</span>
+            </button>
+            <button type="button" class="mult-step active" data-mult-legs="4" id="mult-btn-4">
+              <strong>8×</strong>
+              <span>4 Picks</span>
+            </button>
+            <button type="button" class="mult-step" data-mult-legs="5" id="mult-btn-5">
+              <strong>12×</strong>
+              <span>5 Picks</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Exact Parlay Review Bottom Sheet from parlay_deck.dart -->
+        <div class="app-sheet">
+          <div class="parlay-header-row">
+            <h3 class="t-h2" id="parlay-title-count" style="font-size:24px">Review 4-pick parlay</h3>
+            <span class="parlay-mult-badge" id="parlay-mult-display">8×</span>
+          </div>
+
+          <div class="parlay-legs-list" id="parlay-legs-mount"></div>
+
+          <div class="parlay-Bottom-bar">
+            <div class="wager-control">
+              <button type="button" class="wager-btn" id="parlay-stake-minus" aria-label="Decrease parlay wager">−</button>
+              <div class="wager-readout">
+                <strong id="parlay-stake-val">100</strong>
+                <span>coins</span>
+              </div>
+              <button type="button" class="wager-btn" id="parlay-stake-plus" aria-label="Increase parlay wager">+</button>
+            </div>
+
+            <div class="parlay-payout-readout" style="text-align:right">
+              <div style="font-size:12px;color:var(--dim);margin-bottom:2px">Total return</div>
+              <div class="payout-num" id="parlay-return-val">900 coins</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <hr class="hr">
+
+    <!-- 3. WEEKLY CONTESTS & 10-CARD HEAD-TO-HEAD DUELS -->
+    <section id="contests" class="feature-section">
+      <div class="section-head">
+        <p class="t-label">03 · WEEKLY CONTESTS &amp; HEAD-TO-HEAD DUELS</p>
+        <h2 class="t-h2">Compete against the whole leaderboard—or lock 10 frozen lines with a friend.</h2>
+        <p class="t-body">
+          Enter the free 7-day Weekly Contest where your best 5 daily scores count toward a $1,500 prize pool, or tap the share arrow on any card to send a 10-card Head-to-Head challenge over SMS or Messages.
+        </p>
+      </div>
+
+      <div class="split-showcase">
+        <!-- ContestHub replica from contest_hub.dart -->
+        <div class="app-sheet">
+          <div style="color:var(--green);font-weight:700;font-size:13px;margin-bottom:6px">Day 4 of 7</div>
+          <h3 class="t-h2" style="font-size:24px;margin-bottom:4px">Weekly contest</h3>
+          <p style="font-size:14px;color:var(--dim)">5 daily predictions + combined-points tiebreaker · Best 5 of 7 days count</p>
+
+          <div class="contest-stats-row">
+            <div>
+              <div style="font-size:12.5px;color:var(--dim)">Weekly points</div>
+              <div style="font-size:26px;font-weight:800;margin-top:4px">28 <span style="font-size:15px;color:var(--dim);font-weight:500">/ 35</span></div>
+            </div>
+            <div>
+              <div style="font-size:12.5px;color:var(--dim)">Days counted</div>
+              <div style="font-size:26px;font-weight:800;margin-top:4px">4 <span style="font-size:15px;color:var(--dim);font-weight:500">/ 5</span></div>
+            </div>
+            <div style="margin-left:auto">
+              <div style="font-size:12.5px;color:var(--dim)">Rank</div>
+              <div style="font-size:26px;font-weight:800;color:var(--green);margin-top:4px">#4</div>
+            </div>
+          </div>
+
+          <div class="dow-strip">
+            <div class="dow-cell"><div class="dow-name">Mon</div><div class="dow-pts">5 pt</div></div>
+            <div class="dow-cell"><div class="dow-name">Tue</div><div class="dow-pts">4 pt</div></div>
+            <div class="dow-cell"><div class="dow-name">Wed</div><div class="dow-pts">5 pt</div></div>
+            <div class="dow-cell today"><div class="dow-name">Thu</div><div class="dow-pts" style="color:var(--green)">Today</div></div>
+            <div class="dow-cell"><div class="dow-name">Fri</div><div class="dow-pts">Open</div></div>
+            <div class="dow-cell"><div class="dow-name">Sat</div><div class="dow-pts">Open</div></div>
+            <div class="dow-cell"><div class="dow-name">Sun</div><div class="dow-pts">Open</div></div>
+          </div>
+
+          <div class="prize-row">
+            <div>
+              <div style="font-size:13px;font-weight:700;color:var(--text)">Weekly Prize Pool</div>
+              <div style="font-size:12.5px;color:var(--dim);margin-top:4px">1st $300 · 2nd $150 · 3rd $100 · 4th–10th $40 · 11th–60th $13.60</div>
+            </div>
+            <div class="prize-pool-amount">$1,500</div>
+          </div>
+        </div>
+
+        <!-- Head-to-Head Duel replica from challenge_share.dart -->
+        <div class="app-sheet">
+          <div class="t-label" style="color:var(--green)">HEAD TO HEAD · 10 FROZEN LINES</div>
+          <h3 class="t-h2" style="font-size:24px;margin-top:6px;margin-bottom:4px">Challenge a friend</h3>
+          <p style="font-size:14px;color:var(--dim)">Both players get the exact same 10 frozen lines + 1 total-points tiebreaker. Zero coin risk.</p>
+
+          <div class="duel-score-header">
+            <div class="duel-player">
+              <div class="initials-badge">YN</div>
+              <div>
+                <div style="font-weight:700;font-size:14.5px">You</div>
+                <div style="font-size:12px;color:var(--dim)">TB: 218 pts (off by 2)</div>
+              </div>
+            </div>
+
+            <div class="duel-big-score">
+              <span style="color:var(--green)">8</span>
+              <span style="color:var(--dim);margin:0 4px">–</span>
+              <span>7</span>
+            </div>
+
+            <div class="duel-player">
+              <div style="text-align:right">
+                <div style="font-weight:700;font-size:14.5px">Alex M.</div>
+                <div style="font-size:12px;color:var(--dim)">TB: 211 pts (off by 9)</div>
+              </div>
+              <div class="initials-badge opp">AM</div>
+            </div>
+          </div>
+
+          <div class="duel-rows">
+            <div class="duel-pick-row">
+              <span style="color:var(--over);font-weight:700">✓ Over 264.5</span>
+              <span style="color:var(--dim);font-weight:600">Josh Allen · Pass Yds (289)</span>
+              <span style="color:var(--under);text-align:right">Under 264.5 ✗</span>
+            </div>
+            <div class="duel-pick-row">
+              <span style="color:var(--over);font-weight:700">✓ Over 29.5</span>
+              <span style="color:var(--dim);font-weight:600">Jayson Tatum · Pts (33)</span>
+              <span style="color:var(--over);font-weight:700;text-align:right">Over 29.5 ✓</span>
+            </div>
+            <div class="duel-pick-row">
+              <span style="color:var(--under);font-weight:700">✓ Under 92.5</span>
+              <span style="color:var(--dim);font-weight:600">Justin Jefferson · Rec Yds (84)</span>
+              <span style="color:var(--over);text-align:right">Over 92.5 ✗</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <hr class="hr">
+
+    <!-- 4. CARD TIERS & PLAYER MASTERY -->
+    <section id="tiers" class="feature-section">
+      <div class="split-showcase">
+        <div>
+          <div class="section-head" style="margin-bottom:22px">
+            <p class="t-label">04 · CHROME SPORT FINISHES &amp; MASTERY</p>
+            <h2 class="t-h2">Five card tiers earned purely by calling games right.</h2>
+            <p class="t-body">
+              Every correct free single call advances your mastery on that athlete or team. Unlock Base after 1 call, Bronze at 20, Silver at 80, Gold at 200, and prismatic Diamond at 400. Paid packs and coin wagers never buy mastery.
+            </p>
+          </div>
+
+          <div class="tiers-selector" role="group" aria-label="Inspect Chrome Sport finishes">
+            <button type="button" class="tier-btn" data-tier-select="base" id="tier-btn-base">
+              <span class="tier-btn-name">Base</span>
+              <span class="tier-btn-req">1 correct call</span>
+            </button>
+            <button type="button" class="tier-btn" data-tier-select="bronze" id="tier-btn-bronze">
+              <span class="tier-btn-name" style="color:#E7B48F">Bronze</span>
+              <span class="tier-btn-req">20 correct calls</span>
+            </button>
+            <button type="button" class="tier-btn" data-tier-select="silver" id="tier-btn-silver">
+              <span class="tier-btn-name" style="color:#D8E0E8">Silver</span>
+              <span class="tier-btn-req">80 correct calls</span>
+            </button>
+            <button type="button" class="tier-btn" data-tier-select="gold" id="tier-btn-gold">
+              <span class="tier-btn-name" style="color:#FFE082">Gold</span>
+              <span class="tier-btn-req">200 correct calls</span>
+            </button>
+            <button type="button" class="tier-btn active" data-tier-select="diamond" id="tier-btn-diamond">
+              <span class="tier-btn-name" style="color:#C9F6FF">Diamond</span>
+              <span class="tier-btn-req">400 correct calls</span>
+            </button>
+          </div>
+
+          <p class="t-body" id="tier-inspector-caption" style="font-size:14.5px;color:var(--text)">
+            DIAMOND (400 correct calls) — Prismatic faceted finish. Qualifies for a numbered on-chain Solana Diamond edition.
+          </p>
+        </div>
+
+        <div style="display:flex;justify-content:center" id="tier-inspector-mount"></div>
+      </div>
+    </section>
+
+    <hr class="hr">
+
+    <!-- 5. SELLING DIAMOND CARDS ON THE BLOCKCHAIN -->
+    <section id="blockchain" class="feature-section">
+      <div class="section-head">
+        <p class="t-label">05 · SOLANA BLOCKCHAIN COLLECTIBLES</p>
+        <h2 class="t-h2">Mint numbered Diamond editions. Trade with atomic on-chain settlement.</h2>
+        <p class="t-body">
+          Reaching 400/400 correct free calls on an athlete unlocks a numbered season Diamond collectible on Solana. When you sell a Diamond edition, the buyer’s SOL payment and your Metaplex Core card transfer are co-signed in a single atomic transaction—and your 400/400 mastery badge stays on your profile forever.
+        </p>
+      </div>
+
+      <div class="split-showcase">
+        <div style="display:flex;justify-content:center" id="blockchain-card-mount"></div>
+
+        <!-- Replica of SellCollectibleScreen from sell_collectible_screen.dart -->
+        <div class="app-sheet">
+          <div class="t-label">DIAMOND EDITION · SOLANA</div>
+          <h3 class="t-h2" id="sale-heading" style="font-size:26px;margin-top:6px;margin-bottom:10px">Sell your Diamond.</h3>
+          <p id="sale-phase" style="font-size:15px;font-weight:700;color:var(--text)">
+            Ready for atomic settlement: 0.1 SOL payment and card transfer submit together.
+          </p>
+
+          <div class="chain-steps">
+            <div class="chain-step done">
+              <span class="chain-check">✓</span>
+              <span>Wallet ownership verified with non-payment challenge signature.</span>
+            </div>
+            <div class="chain-step done">
+              <span class="chain-check">✓</span>
+              <span>Numbered Diamond issued on Solana. Original earner and season recorded on-chain.</span>
+            </div>
+            <div class="chain-step done">
+              <span class="chain-check">✓</span>
+              <span>Buyer and seller co-sign the same atomic swap transaction—payment and asset transfer settle together, or neither does.</span>
+            </div>
+          </div>
+
+          <div class="edition-meta-box">
+            <div style="font-weight:700;color:var(--text)">Edition #7 · 2026 Season</div>
+            <div style="color:var(--dim)">Original earner: You (permanently recorded)</div>
+            <div style="color:var(--dim)" id="sale-owner">Current owner: You (Original Earner · 400/400)</div>
+            <div style="font-weight:600;color:var(--green);margin-top:4px" id="sale-status">Sale status: listed · 0.1 devnet SOL</div>
+          </div>
+
+          <div style="display:flex;gap:12px;flex-wrap:wrap">
+            <button type="button" class="btn-primary" id="btn-simulate-sale" style="width:100%">
+              Simulate atomic sale · 0.1 SOL
+            </button>
+            <button type="button" class="btn-ghost" id="btn-reset-sale" style="width:100%;display:none">
+              Reset demo sale
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span class="brand-mark"></span>
+        <strong style="color:var(--text)">Sports Swipe</strong>
+        <span>· NFL &amp; NBA Player Line Cards, Parlays, Contests &amp; On-Chain Collectibles</span>
+      </div>
+      <div>Built with Flutter, Rust &amp; Solana</div>
+    </div>
+  </footer>
+
+  <script src="./script.js"></script>
+</body>
+</html>
