@@ -1,0 +1,12 @@
+{
+  "network": "devnet",
+  "asset": "2yB2p1PJzmnomE16CAQJdZmukicGxAbAvEmPadaiAZMH",
+  "mintSignature": "32Rj54MYCVQAjbUp2TLKeSZr2ypucjpZEpii5JzfjhwHnxTTcjudEZGLbTa92h1WtR8Nrs7faUGiL7v7PDNNta13",
+  "saleSignature": "4ojTLnzc7j7BroUD2j5ZwV2z1oBqjvXpRvgz6EiMNEhPpg18uT8Vq16QAdWXsNq6zPj1EtPGCgJFRigGEPMFd4xf",
+  "lamports": "100000000",
+  "originalEarner": "maya-demo-5f5bee02@example.invalid",
+  "originalEarnerQualifyingCalls": 400,
+  "currentOwner": "78ggN1VaVjBpHRfuaYYLApJpkqWnzzSm27EaakvYrr8c",
+  "seller": "3GCnrMzXvu7ZJFAHAqS5MkPbbGRedK2GXbu3UZSMfPCG",
+  "saleExplorer": "https://explorer.solana.com/tx/4ojTLnzc7j7BroUD2j5ZwV2z1oBqjvXpRvgz6EiMNEhPpg18uT8Vq16QAdWXsNq6zPj1EtPGCgJFRigGEPMFd4xf?cluster=devnet"
+}

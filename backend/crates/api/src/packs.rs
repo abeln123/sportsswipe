@@ -55,7 +55,7 @@ async fn store(State(state): State<AppState>, user: AuthUser, Query(q): Query<Sp
     .fetch_one(&state.pool)
     .await?;
     Ok(Json(json!({
-        "packs": packs,
+        "packs": packs, "presentationAvailable": user.is_admin,
         "leftoverCount": leftover_count,
         "challenges": ss_db::packs::open_challenges(&state.pool, user.id).await?,
     })))

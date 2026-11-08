@@ -28,9 +28,14 @@ pub async fn visible(state: &AppState, viewer: Uuid, id: Uuid) -> ApiResult<Valu
         .await?
         .ok_or(ApiError::NotFound)?;
     if crate::social::blocked_either(&state.pool, viewer, owner).await?
-        || (kind != "research" && !crate::profile::can_view(state, viewer, owner).await?)
+        || (kind != "research" && kind != "head_to_head" && !crate::profile::can_view(state, viewer, owner).await?)
     {
         return Ok(json!({"kind":"unavailable","title":"This item is private"}));
+    }
+    if kind=="head_to_head" {
+        let challenge=payload["challengeId"].as_str().and_then(|id|Uuid::parse_str(id).ok()).ok_or(ApiError::NotFound)?;
+        let allowed:bool=sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM head_to_heads WHERE id=$1 AND (creator_id=$2 OR opponent_id=$2))").bind(challenge).bind(viewer).fetch_one(&state.pool).await?;
+        if !allowed {return Ok(json!({"kind":"unavailable","title":"Private challenge"}));}
     }
     Ok(json!({"id":id,"kind":kind,"payload":payload}))
 }

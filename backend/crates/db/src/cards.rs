@@ -170,7 +170,7 @@ pub async fn market_rows(pool: &PgPool, market_ids: &[i64]) -> Result<Vec<Market
 pub async fn deck_market_ids(pool: &PgPool, user_id: Uuid, league: Option<&str>, limit: i64) -> Result<Vec<i64>> {
     Ok(sqlx::query_scalar(
         r#"SELECT m.id FROM markets m JOIN players p ON p.id = m.player_id
-           WHERE m.status = 'open' AND m.lock_at > now()
+           WHERE NOT EXISTS(SELECT 1 FROM presentation_cards pc WHERE pc.player_id=p.id) AND m.status = 'open' AND m.lock_at > now()
              AND ($2::text IS NULL OR p.league = $2)
              AND NOT EXISTS (SELECT 1 FROM entries e WHERE e.user_id = $1 AND e.single_market_id = m.id)
            ORDER BY m.lock_at, m.id LIMIT $3"#,

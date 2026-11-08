@@ -2,11 +2,14 @@ mod admin;
 mod analyst;
 mod auth;
 mod contests;
+mod collectibles;
 mod error;
 mod export;
 mod game;
 mod invites;
 mod packs;
+mod presentation;
+mod head_to_head;
 mod profile;
 mod social;
 mod shares;
@@ -45,6 +48,9 @@ async fn main() -> anyhow::Result<()> {
         .merge(analyst::routes())
         .merge(export::routes())
         .merge(packs::routes())
+        .merge(presentation::routes())
+        .merge(head_to_head::routes())
+        .merge(collectibles::routes())
         .route("/healthz", get(|| async { "ok" }));
 
     let mut app = Router::new()

@@ -18,6 +18,7 @@ import '../../ui/widgets.dart';
 import 'pack_art.dart';
 import 'pack_feedback.dart';
 import 'pack_deck.dart';
+import 'presentation_deck.dart';
 
 const _uuid = Uuid();
 
@@ -62,13 +63,14 @@ class PackOffer {
 
 /// Cards being played: a freshly opened pack, or the leftovers.
 class _Session {
-  _Session({required this.id, required this.title, required this.cards, this.pack, this.targetPct, this.payout});
+  _Session({required this.id, required this.title, required this.cards, this.pack, this.targetPct, this.payout, this.presentation = false});
   final String id;
   final String title;
   final List<PlayableCard> cards;
   final FoilPack? pack;
   final int? targetPct;
   final int? payout;
+  final bool presentation;
 }
 
 class PackStore extends ConsumerStatefulWidget {
@@ -247,6 +249,8 @@ class _PackStoreState extends ConsumerState<PackStore> {
         count: s.cards.length,
         onDone: () => setState(() => _opening = false),
       );
+    } else if (s != null && s.presentation) {
+      view = PresentationDeck(cards: s.cards, onExit: _exit);
     } else if (s != null) {
       view = PackDeck(
         key: ValueKey(s.id),
@@ -287,6 +291,68 @@ class _PackStoreState extends ConsumerState<PackStore> {
         padding: const EdgeInsets.fromLTRB(16, 6, 16, 28),
         children: [
           const Text('Packs', style: T.h1),
+          if (_data?['presentationAvailable'] == true) ...[
+            const SizedBox(height: 14),
+            InkWell(
+              onTap: _buying
+                  ? null
+                  : () async {
+                      if (_buying) return;
+                      setState(() => _buying = true);
+                      try {
+                        final r = await api.post('/admin/presentation-pack', {});
+                        if (!mounted) return;
+                        final cards = (r['cards'] as List).map((c) => PlayableCard.fromJson((c as Map).cast<String, dynamic>())).toList();
+                        setState(() {
+                          _session = _Session(
+                            id: 'presentation',
+                            title: 'Presentation Pack',
+                            cards: cards,
+                            presentation: true,
+                            pack: const FoilPack(
+                              name: 'Presentation Pack',
+                              colors: [Color(0xFF583B91), Color(0xFFC9F6FF)],
+                              badge: 'ADMIN',
+                              caption: '5 fixed cards · Diamond unlocked',
+                              width: 220,
+                            ),
+                          );
+                          _opening = true;
+                        });
+                      } on ApiException catch (e) {
+                        if (mounted) toast(context, e.message, ok: false);
+                      } finally {
+                        if (mounted) setState(() => _buying = false);
+                      }
+                    },
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: C.surface,
+                  border: Border.all(color: const Color(0xFFB5B4E9)),
+                ),
+                child: Row(
+                  children: [
+                    const FoilPack(name: 'Presentation', colors: [Color(0xFF583B91), Color(0xFFC9F6FF)], width: 66),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('ADMIN ONLY', style: T.label),
+                          const SizedBox(height: 6),
+                          const Text('Presentation Pack', style: T.h2),
+                          const SizedBox(height: 4),
+                          Text(_buying ? 'Preparing…' : '5 fixed cards · 400/400 Diamond ready', style: T.small),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 14),
+          ],
           const SizedBox(height: 4),
           const Text('Open a pack and swipe every card. Results settle after each game.', style: T.dim),
           if (leftovers > 0) ...[const SizedBox(height: 16), _LeftoverStrip(count: leftovers, onPlay: _leftovers)],
@@ -352,8 +418,10 @@ class _PackTile extends StatelessWidget {
                 builder: (context, box) => Center(
                   child: AnimatedBuilder(
                     animation: sheen,
-                    builder: (context, _) =>
-                        offer.art(width: (box.maxHeight / 1.42).clamp(0.0, box.maxWidth), sheen: onTap == null ? 0 : sheen.value),
+                    builder: (context, _) => offer.art(
+                      width: (box.maxHeight / foilPackHeightRatio).clamp(0.0, box.maxWidth),
+                      sheen: onTap == null ? 0 : sheen.value,
+                    ),
                   ),
                 ),
               ),

@@ -89,3 +89,18 @@ cues if a physical reference shoot is available. The wrapper uses Flutter canvas
 geometry; no Blender renders or recorded pack footage are bundled. Test drag feel,
 audio timing, haptics, and frame pacing on physical iPhone and Android hardware
 before release.
+
+Admin judging flow: **Play → Presentation Pack → Collection → Diamond → Sell**.
+The pack contains five fixed fictional cards and an explicitly marked 400/400
+admin Diamond grant. See [collectible setup](collectibles/README.md) for devnet
+issuer and presentation-buyer configuration.
+
+Card footer share arrows create ten-card head-to-heads. A friend receives the
+invitation in Messages; an external invite opens `/duel/TOKEN` in a browser and
+returns there after signup. Both players get the exact same frozen lines and
+submit ten private picks plus a combined-total-points tiebreaker before the first
+card locks. Scores use one point per correct call and then absolute tiebreaker
+error; exact ties remain draws. These matches never award coins or mastery.
+Head-to-heads appear in Social → Messages. Run
+`scripts/test_presentation_head_to_head.py` against an isolated local API/DB for
+admin permissions, frozen lines, invitation access, scoring, and zero coin effects.

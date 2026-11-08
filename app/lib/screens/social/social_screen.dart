@@ -8,6 +8,7 @@ import '../../card/card_spec.dart';
 import '../../card/sport_card.dart';
 import '../../core/format.dart' as f;
 import 'league_screen.dart';
+import 'head_to_head_screen.dart';
 
 import 'package:go_router/go_router.dart';
 
@@ -445,6 +446,7 @@ class _MessagesTabState extends State<_MessagesTab> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            const HeadToHeadList(),
             const SizedBox(height: 12),
             if (dms.isEmpty)
               const Padding(

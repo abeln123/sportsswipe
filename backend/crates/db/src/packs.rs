@@ -66,7 +66,7 @@ const CANDIDATES: &str = r#"
         JOIN players p ON p.id = m.player_id
         JOIN games g ON g.id = m.game_id
         JOIN line_versions lv ON lv.market_id = m.id AND lv.version = m.current_version
-        WHERE m.status = 'open' AND m.lock_at > now() + interval '5 minutes'
+        WHERE NOT EXISTS(SELECT 1 FROM presentation_cards pc WHERE pc.player_id=p.id) AND m.status = 'open' AND m.lock_at > now() + interval '5 minutes'
     )
     SELECT {select} FROM ranked r
     WHERE ($2::text IS NULL OR r.league = $2)

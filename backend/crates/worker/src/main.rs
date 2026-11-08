@@ -26,6 +26,7 @@ async fn main() -> Result<()> {
     );
     let args: Vec<String> = std::env::args().skip(1).collect();
     match args.first().map(String::as_str) {
+        Some("grade-jobs") => drain_jobs(&pool, &espn).await?,
         Some("backfill") => {
             let days = args.get(1).and_then(|d| d.parse().ok()).unwrap_or(21);
             ingest::sync_catalog(&pool, &espn).await?;

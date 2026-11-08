@@ -1,0 +1,12 @@
+{
+  "network": "devnet",
+  "presentation": true,
+  "asset": "4PbnWU42HGk3wYp2UW11KJYPwKbhFsGbb4oyfw3ningY",
+  "mintSignature": "3JiYXkFDrcAyca5c4zDYcMozgQSHZD4hDD8Sdp7j7hToFLxkHRWUT8qAWcoA7RSKtAUhwtMMQ5sr9zh3esMA87ET",
+  "saleSignature": "5FhLdBD3sMWCQAVmoXNdokYQx4CZcSYcn73tDKZZXbJ9hBNmHyFq7XtZqQ7d6U7YA7dchLwnvjLHczJJYbQtdKFg",
+  "saleExplorer": "https://explorer.solana.com/tx/5FhLdBD3sMWCQAVmoXNdokYQx4CZcSYcn73tDKZZXbJ9hBNmHyFq7XtZqQ7d6U7YA7dchLwnvjLHczJJYbQtdKFg?cluster=devnet",
+  "priceDevnetSol": 0.1,
+  "originalEarner": "Admin Presentation DEMO",
+  "retainedMastery": 400,
+  "buyer": "78ggN1VaVjBpHRfuaYYLApJpkqWnzzSm27EaakvYrr8c"
+}

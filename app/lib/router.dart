@@ -8,15 +8,17 @@ import 'screens/picks_screen.dart';
 import 'screens/play/contest_entry_screen.dart';
 import 'screens/play/play_screen.dart';
 import 'screens/profile/admin_screen.dart';
+import 'screens/profile/sell_collectible_screen.dart';
 import 'screens/profile/profile_screen.dart';
 import 'screens/profile/user_profile_screen.dart';
 import 'screens/social/league_screen.dart';
 import 'screens/social/social_screen.dart';
 import 'screens/social/thread_screen.dart';
+import 'screens/social/head_to_head_screen.dart';
 import 'state/session.dart';
 import 'ui/shell.dart';
 
-const _public = ['/login', '/invite'];
+const _public = ['/login', '/invite', '/duel'];
 
 String? _redirect(BuildContext context, GoRouterState state) {
   final loc = state.uri.toString();
@@ -48,6 +50,10 @@ final router = GoRouter(
       path: '/invite/:token',
       builder: (_, s) => InviteScreen(token: s.pathParameters['token']!),
     ),
+    GoRoute(
+      path: '/duel/:token',
+      builder: (_, s) => HeadToHeadInviteScreen(token: s.pathParameters['token']!),
+    ),
     StatefulShellRoute.indexedStack(
       builder: (_, _, shell) => AppShell(shell: shell),
       branches: [
@@ -78,6 +84,10 @@ final router = GoRouter(
               builder: (_, s) => SocialScreen(initialTab: int.tryParse(s.uri.queryParameters['tab'] ?? '') ?? 0),
               routes: [
                 GoRoute(
+                  path: 'head-to-head/:id',
+                  builder: (_, s) => HeadToHeadScreen(id: s.pathParameters['id']!),
+                ),
+                GoRoute(
                   path: 'thread/:id',
                   builder: (_, s) => ThreadScreen(threadId: s.pathParameters['id']!, title: s.uri.queryParameters['title'] ?? 'Messages'),
                 ),
@@ -98,7 +108,16 @@ final router = GoRouter(
             GoRoute(
               path: '/profile',
               builder: (_, s) => ProfileScreen(initialTab: int.tryParse(s.uri.queryParameters['tab'] ?? '') ?? 0),
-              routes: [GoRoute(path: 'admin', builder: (_, _) => const AdminScreen())],
+              routes: [
+                GoRoute(path: 'admin', builder: (_, _) => const AdminScreen()),
+                GoRoute(
+                  path: 'sell/:playerId',
+                  builder: (_, s) => SellCollectibleScreen(
+                    playerId: int.parse(s.pathParameters['playerId']!),
+                    presentation: s.uri.queryParameters['presentation'] == 'true',
+                  ),
+                ),
+              ],
             ),
           ],
         ),

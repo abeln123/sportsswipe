@@ -1,3 +1,5 @@
+import 'package:url_launcher/url_launcher.dart';
+
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -308,6 +310,16 @@ class _CollectionTabState extends State<_CollectionTab> {
             icon: const Icon(Icons.ios_share, size: 16),
             label: const Text('Share earned card'),
           ),
+          if ((c['mastery']['count'] as num? ?? 0) >= 400)
+            TextButton.icon(
+              onPressed: () {
+                Navigator.pop(ctx);
+                context.go('/profile/sell/${spec.playerId}?presentation=${c['presentation'] == true}');
+              },
+              icon: const Icon(Icons.sell_outlined, size: 18),
+              label: Text(c['presentation'] == true ? 'Sell presentation Diamond' : 'Sell Diamond edition (devnet)'),
+            ),
+          if (c['presentation'] == true) const Text('ADMIN PRESENTATION · 400/400 demo grant', style: T.small),
           const Text('Card finish', style: T.label),
           const SizedBox(height: 6),
           const Text('Finishes change appearance only. Mastery is earned separately.', style: T.dim),
@@ -356,6 +368,40 @@ class _CollectionTabState extends State<_CollectionTab> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const PageTitle('Collection', 'Player cards and earned mastery'),
+            Container(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              decoration: const BoxDecoration(
+                border: Border(bottom: BorderSide(color: C.line)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('DIAMOND EDITIONS · DEVNET', style: T.label),
+                  const SizedBox(height: 6),
+                  const Text('Your achievement. A collectible with a history.', style: T.h3),
+                  const SizedBox(height: 6),
+                  const Text(
+                    '400 correct free calls qualify. A sale transfers the edition; your mastery stays yours. Test SOL only.',
+                    style: T.small,
+                  ),
+                  TextButton.icon(
+                    icon: const Icon(Icons.open_in_new, size: 16),
+                    label: const Text('Open devnet collection'),
+                    onPressed: () async {
+                      try {
+                        final r = await api.post('/collectibles/handoff', {});
+                        if (!context.mounted) return;
+                        final opened = await launchUrl(Uri.parse(r['url'] as String), mode: LaunchMode.externalApplication);
+                        if (!opened && context.mounted) toast(context, 'Could not open the devnet collection.', ok: false);
+                      } on ApiException catch (e) {
+                        if (context.mounted) toast(context, e.message, ok: false);
+                      }
+                    },
+                  ),
+                ],
+              ),
+            ),
+
             InkWell(
               onTap: widget.onStore,
               child: Container(

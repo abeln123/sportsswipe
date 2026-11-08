@@ -1,0 +1,25 @@
+{
+  "name": "sportsswipe-devnet-collectibles",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node src/server.mjs",
+    "build": "esbuild web/app.js --bundle --format=esm --outfile=../app/web/collectibles/app.js && esbuild web/wallet-bridge.js --bundle --format=esm --outfile=../app/web/collectibles/wallet.js",
+    "test": "node --test test/*.test.mjs",
+    "issuer": "node src/issuer.mjs"
+  },
+  "dependencies": {
+    "@metaplex-foundation/mpl-core": "^1.10.0",
+    "@metaplex-foundation/umi": "^1.4.1",
+    "@metaplex-foundation/umi-bundle-defaults": "^1.4.1",
+    "@metaplex-foundation/umi-web3js-adapters": "^1.4.1",
+    "@solana/web3.js": "^1.98.4",
+    "bs58": "^6.0.0",
+    "buffer": "^6.0.3",
+    "pg": "^8.16.3",
+    "tweetnacl": "^1.0.3"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.12"
+  }
+}

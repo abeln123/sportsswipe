@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../core/format.dart' as f;
 import '../core/theme.dart';
+import '../ui/challenge_share.dart';
 import 'card_spec.dart';
 import 'jersey_painter.dart';
 
@@ -10,20 +11,20 @@ enum CardVariant { full, contest, tile }
 /// Frame colors per finish. Finishes change appearance only.
 class Finish {
   static List<Color> frame(String finish) => switch (finish) {
-        'bronze' => const [Color(0xFFE7B48F), Color(0xFFA8643C), Color(0xFFE2A77E)],
-        'silver' => const [Color(0xFFFFFFFF), Color(0xFFB9C2CC), Color(0xFFF2F5F8)],
-        'gold' => const [Color(0xFFFFE8A3), Color(0xFFC9972B), Color(0xFFFFDD7A)],
-        'diamond' => const [Color(0xFFC9F6FF), Color(0xFFE5CCFF), Color(0xFFFFFFFF), Color(0xFFB5E8FF)],
-        _ => const [Color(0xFFF7F9FB), Color(0xFFC6CED6), Color(0xFFEFF3F6)],
-      };
+    'bronze' => const [Color(0xFFE7B48F), Color(0xFFA8643C), Color(0xFFE2A77E)],
+    'silver' => const [Color(0xFFFFFFFF), Color(0xFFB9C2CC), Color(0xFFF2F5F8)],
+    'gold' => const [Color(0xFFFFE8A3), Color(0xFFC9972B), Color(0xFFFFDD7A)],
+    'diamond' => const [Color(0xFFC9F6FF), Color(0xFFE5CCFF), Color(0xFFFFFFFF), Color(0xFFB5E8FF)],
+    _ => const [Color(0xFFF7F9FB), Color(0xFFC6CED6), Color(0xFFEFF3F6)],
+  };
 
   static Color accent(String finish) => switch (finish) {
-        'bronze' => const Color(0xFFB8733F),
-        'silver' => const Color(0xFF8E9AA6),
-        'gold' => const Color(0xFFC9972B),
-        'diamond' => const Color(0xFF8C7BF0),
-        _ => C.ink,
-      };
+    'bronze' => const Color(0xFFB8733F),
+    'silver' => const Color(0xFF8E9AA6),
+    'gold' => const Color(0xFFC9972B),
+    'diamond' => const Color(0xFF8C7BF0),
+    _ => C.ink,
+  };
 }
 
 /// The universal Chrome Sport card. Every variant shares the same frame,
@@ -81,7 +82,10 @@ class SportCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 _topBar(s),
-                SizedBox(height: heroHeight, child: _Hero(spec: spec, scale: s)),
+                SizedBox(
+                  height: heroHeight,
+                  child: _Hero(spec: spec, scale: s),
+                ),
                 Container(height: 1.5 * s, color: spec.colorway.base.withValues(alpha: 0.35)),
                 Padding(
                   padding: EdgeInsets.fromLTRB(16 * s, 12 * s, 16 * s, 0),
@@ -92,17 +96,40 @@ class SportCard extends StatelessWidget {
                     Padding(
                       padding: EdgeInsets.fromLTRB(16 * s, 4 * s, 16 * s, 0),
                       child: Text(
-                          '${market!.isGame ? '${market!.awayAbbr} at ${market!.homeAbbr}' : market!.matchup} · ${f.time(market!.startAt)}',
-                          style: TextStyle(fontSize: 12.5 * s, fontWeight: FontWeight.w600, color: C.ink)),
+                        '${market!.isGame ? '${market!.awayAbbr} at ${market!.homeAbbr}' : market!.matchup} · ${f.time(market!.startAt)}',
+                        style: TextStyle(fontSize: 12.5 * s, fontWeight: FontWeight.w600, color: C.ink),
+                      ),
                     ),
-                  Padding(padding: EdgeInsets.symmetric(horizontal: 16 * s), child: _divider(s)),
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 16 * s),
+                    child: _divider(s),
+                  ),
                   Padding(
                     padding: EdgeInsets.symmetric(horizontal: 16 * s),
                     child: _LineRow(market: market!, scale: s, contest: variant == CardVariant.contest),
                   ),
                 ],
-                if (body != null) Padding(padding: EdgeInsets.symmetric(horizontal: 16 * s), child: body!),
-                ?footer,
+                if (body != null)
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 16 * s),
+                    child: body!,
+                  ),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Expanded(
+                      child:
+                          footer ?? CardFooter(spec: spec, scale: s, finish: finish, left: finish.toUpperCase(), right: 'Earn Base: 0/1'),
+                    ),
+                    IconButton(
+                      tooltip: 'Share card and start a head-to-head',
+                      onPressed: () => challengeShare(context, playerId: spec.playerId, marketId: market?.marketId),
+                      icon: Icon(Icons.near_me_outlined, size: 18 * s, color: C.ink),
+                      constraints: const BoxConstraints(minWidth: 40, minHeight: 44),
+                      padding: const EdgeInsets.all(8),
+                    ),
+                  ],
+                ),
               ],
             ),
           ),
@@ -111,7 +138,11 @@ class SportCard extends StatelessWidget {
     );
   }
 
-  Widget _divider(double s) => Container(margin: EdgeInsets.symmetric(vertical: 8 * s), height: 1, color: const Color(0xFFCBD3DB));
+  Widget _divider(double s) => Container(
+    margin: EdgeInsets.symmetric(vertical: 8 * s),
+    height: 1,
+    color: const Color(0xFFCBD3DB),
+  );
 
   Widget _topBar(double s) {
     return Padding(
@@ -123,11 +154,16 @@ class SportCard extends StatelessWidget {
             child: Container(width: 9 * s, height: 11 * s, color: spec.colorway.base),
           ),
           SizedBox(width: 8 * s),
-          Text(topLeft ?? '${spec.teamAbbr} / ${spec.leagueLabel}',
-              style: TextStyle(fontSize: 12 * s, fontWeight: FontWeight.w800, letterSpacing: 1.2, color: C.ink)),
+          Text(
+            topLeft ?? '${spec.teamAbbr} / ${spec.leagueLabel}',
+            style: TextStyle(fontSize: 12 * s, fontWeight: FontWeight.w800, letterSpacing: 1.2, color: C.ink),
+          ),
           const Spacer(),
           if (topRight != null)
-            Text(topRight!, style: TextStyle(fontSize: 12 * s, fontWeight: FontWeight.w800, letterSpacing: 1.2, color: C.ink)),
+            Text(
+              topRight!,
+              style: TextStyle(fontSize: 12 * s, fontWeight: FontWeight.w800, letterSpacing: 1.2, color: C.ink),
+            ),
         ],
       ),
     );
@@ -168,8 +204,10 @@ class _Hero extends StatelessWidget {
           child: Center(
             child: RotatedBox(
               quarterTurns: 1,
-              child: Text('CHROME SPORT',
-                  style: TextStyle(fontSize: 7.5 * s, letterSpacing: 2.4, fontWeight: FontWeight.w700, color: C.inkDim)),
+              child: Text(
+                'CHROME SPORT',
+                style: TextStyle(fontSize: 7.5 * s, letterSpacing: 2.4, fontWeight: FontWeight.w700, color: C.inkDim),
+              ),
             ),
           ),
         ),
@@ -235,10 +273,12 @@ class _NameBlock extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(spec.firstName.toUpperCase(),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 12 * s, letterSpacing: 3, fontWeight: FontWeight.w700, color: C.ink)),
+                Text(
+                  spec.firstName.toUpperCase(),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 12 * s, letterSpacing: 3, fontWeight: FontWeight.w700, color: C.ink),
+                ),
                 // Long names shrink to fit instead of wrapping.
                 SizedBox(
                   height: (compact ? 46 : 54) * s,
@@ -264,20 +304,27 @@ class _NameBlock extends StatelessWidget {
             ),
           ),
           if (!compact) ...[
-            Container(width: 1, margin: EdgeInsets.symmetric(horizontal: 12 * s), color: const Color(0xFF9AA6B2)),
+            Container(
+              width: 1,
+              margin: EdgeInsets.symmetric(horizontal: 12 * s),
+              color: const Color(0xFF9AA6B2),
+            ),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text(spec.isTeam ? 'VS' : 'NO.',
-                    style: TextStyle(fontSize: 10 * s, fontWeight: FontWeight.w700, letterSpacing: 1.5, color: C.ink)),
                 Text(
-                    spec.isTeam
-                        ? (opponent ?? '–')
-                        : (spec.jerseyNumber.isEmpty ? '–' : spec.jerseyNumber),
-                    style: TextStyle(fontFamily: kCondensed, fontWeight: FontWeight.w800, fontSize: 30 * s, height: 1, color: C.ink)),
-                Text(spec.isTeam ? 'GAME CARD' : spec.series.toUpperCase(),
-                    style: TextStyle(fontSize: 7.5 * s, fontWeight: FontWeight.w700, letterSpacing: 1.2, color: C.inkDim)),
+                  spec.isTeam ? 'VS' : 'NO.',
+                  style: TextStyle(fontSize: 10 * s, fontWeight: FontWeight.w700, letterSpacing: 1.5, color: C.ink),
+                ),
+                Text(
+                  spec.isTeam ? (opponent ?? '–') : (spec.jerseyNumber.isEmpty ? '–' : spec.jerseyNumber),
+                  style: TextStyle(fontFamily: kCondensed, fontWeight: FontWeight.w800, fontSize: 30 * s, height: 1, color: C.ink),
+                ),
+                Text(
+                  spec.isTeam ? 'GAME CARD' : spec.series.toUpperCase(),
+                  style: TextStyle(fontSize: 7.5 * s, fontWeight: FontWeight.w700, letterSpacing: 1.2, color: C.inkDim),
+                ),
               ],
             ),
           ],
@@ -306,26 +353,36 @@ class _LineRow extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Text(big,
-            style: TextStyle(fontFamily: kCondensed, fontWeight: FontWeight.w800, fontSize: 44 * s, height: 1, color: C.ink)),
-        Container(width: 1.2, height: 34 * s, margin: EdgeInsets.symmetric(horizontal: 12 * s), color: C.ink),
+        Text(
+          big,
+          style: TextStyle(fontFamily: kCondensed, fontWeight: FontWeight.w800, fontSize: 44 * s, height: 1, color: C.ink),
+        ),
+        Container(
+          width: 1.2,
+          height: 34 * s,
+          margin: EdgeInsets.symmetric(horizontal: 12 * s),
+          color: C.ink,
+        ),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(short,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontFamily: kCondensed, fontWeight: FontWeight.w800, fontSize: 20 * s, height: 1.05, color: C.ink)),
               Text(
-                  contest
-                      ? 'Shared contest line'
-                      : m.isGame
-                          ? 'Right ${m.overLabel} · Left ${m.underLabel}'
-                          : 'Locks ${f.dayTime(m.lockAt)}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: 11.5 * s, color: C.inkDim)),
+                short,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontFamily: kCondensed, fontWeight: FontWeight.w800, fontSize: 20 * s, height: 1.05, color: C.ink),
+              ),
+              Text(
+                contest
+                    ? 'Shared contest line'
+                    : m.isGame
+                    ? 'Right ${m.overLabel} · Left ${m.underLabel}'
+                    : 'Locks ${f.dayTime(m.lockAt)}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 11.5 * s, color: C.inkDim),
+              ),
             ],
           ),
         ),
@@ -351,17 +408,27 @@ class CardFooter extends StatelessWidget {
     return Container(
       margin: EdgeInsets.only(top: 8 * s),
       padding: EdgeInsets.fromLTRB(14 * s, 8 * s, 14 * s, 9 * s),
-      decoration: const BoxDecoration(border: Border(top: BorderSide(color: Color(0xFFCBD3DB)))),
+      decoration: const BoxDecoration(
+        border: Border(top: BorderSide(color: Color(0xFFCBD3DB))),
+      ),
       child: Row(
         children: [
-          Transform(transform: Matrix4.skewX(-0.35), child: Container(width: 8 * s, height: 10 * s, color: spec.colorway.base)),
+          Transform(
+            transform: Matrix4.skewX(-0.35),
+            child: Container(width: 8 * s, height: 10 * s, color: spec.colorway.base),
+          ),
           SizedBox(width: 7 * s),
-          Text(left, style: TextStyle(fontSize: 12 * s, fontWeight: FontWeight.w800, letterSpacing: 1.2, color: Finish.accent(finish))),
+          Text(
+            left,
+            style: TextStyle(fontSize: 12 * s, fontWeight: FontWeight.w800, letterSpacing: 1.2, color: Finish.accent(finish)),
+          ),
           const Spacer(),
           Flexible(
-            child: Text(right,
-                textAlign: TextAlign.right,
-                style: TextStyle(fontSize: 12 * s, fontWeight: FontWeight.w600, color: C.ink)),
+            child: Text(
+              right,
+              textAlign: TextAlign.right,
+              style: TextStyle(fontSize: 12 * s, fontWeight: FontWeight.w600, color: C.ink),
+            ),
           ),
         ],
       ),
@@ -393,23 +460,39 @@ class RecentForm extends StatelessWidget {
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Recent form', style: TextStyle(fontSize: 12.5 * s, fontWeight: FontWeight.w700, color: C.ink)),
-                Text('Oldest → latest', style: TextStyle(fontSize: 10 * s, color: C.inkDim)),
+                Text(
+                  'Recent form',
+                  style: TextStyle(fontSize: 12.5 * s, fontWeight: FontWeight.w700, color: C.ink),
+                ),
+                Text(
+                  'Oldest → latest',
+                  style: TextStyle(fontSize: 10 * s, color: C.inkDim),
+                ),
               ],
             ),
             const Spacer(),
-            if (values.isEmpty) Text('—', style: TextStyle(fontSize: 14 * s, color: C.inkDim)),
+            if (values.isEmpty)
+              Text(
+                '—',
+                style: TextStyle(fontSize: 14 * s, color: C.inkDim),
+              ),
             for (var i = 0; i < values.length; i++)
               Container(
                 width: 34 * s,
                 padding: EdgeInsets.only(bottom: 2 * s),
                 margin: EdgeInsets.only(left: 2 * s),
                 decoration: i == values.length - 1
-                    ? BoxDecoration(border: Border(bottom: BorderSide(color: const Color(0xFF1F8A4C), width: 2 * s)))
+                    ? BoxDecoration(
+                        border: Border(
+                          bottom: BorderSide(color: const Color(0xFF1F8A4C), width: 2 * s),
+                        ),
+                      )
                     : null,
-                child: Text(f.line(values[i]),
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 14 * s, fontWeight: FontWeight.w700, color: C.ink)),
+                child: Text(
+                  f.line(values[i]),
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 14 * s, fontWeight: FontWeight.w700, color: C.ink),
+                ),
               ),
           ],
         ),
@@ -420,7 +503,14 @@ class RecentForm extends StatelessWidget {
 
 /// Community split bar (Under purple, Over green).
 class CommunityBar extends StatelessWidget {
-  const CommunityBar({super.key, required this.overPct, required this.total, this.scale = 1, this.overLabel = 'Over', this.underLabel = 'Under'});
+  const CommunityBar({
+    super.key,
+    required this.overPct,
+    required this.total,
+    this.scale = 1,
+    this.overLabel = 'Over',
+    this.underLabel = 'Under',
+  });
 
   final int overPct;
   final int total;
@@ -435,26 +525,50 @@ class CommunityBar extends StatelessWidget {
       padding: EdgeInsets.only(top: 8 * s),
       child: Column(
         children: [
-          Row(children: [
-            Text('Community picks', style: TextStyle(fontSize: 12 * s, fontWeight: FontWeight.w700, color: C.ink)),
-            const Spacer(),
-            Text(total == 0 ? 'No picks yet' : '$total picks', style: TextStyle(fontSize: 11 * s, color: C.inkDim)),
-          ]),
-          Row(children: [
-            Text('$underLabel ${100 - overPct}%', style: TextStyle(fontSize: 12 * s, color: C.ink)),
-            const Spacer(),
-            Text('$overPct% $overLabel', style: TextStyle(fontSize: 12 * s, color: C.ink)),
-          ]),
+          Row(
+            children: [
+              Text(
+                'Community picks',
+                style: TextStyle(fontSize: 12 * s, fontWeight: FontWeight.w700, color: C.ink),
+              ),
+              const Spacer(),
+              Text(
+                total == 0 ? 'No picks yet' : '$total picks',
+                style: TextStyle(fontSize: 11 * s, color: C.inkDim),
+              ),
+            ],
+          ),
+          Row(
+            children: [
+              Text(
+                '$underLabel ${100 - overPct}%',
+                style: TextStyle(fontSize: 12 * s, color: C.ink),
+              ),
+              const Spacer(),
+              Text(
+                '$overPct% $overLabel',
+                style: TextStyle(fontSize: 12 * s, color: C.ink),
+              ),
+            ],
+          ),
           SizedBox(height: 3 * s),
           ClipRRect(
             borderRadius: BorderRadius.circular(3),
             child: SizedBox(
               height: 5 * s,
-              child: Row(children: [
-                Expanded(flex: (100 - overPct).clamp(1, 99), child: Container(color: const Color(0xFF8B6FE0))),
-                SizedBox(width: 2 * s),
-                Expanded(flex: overPct.clamp(1, 99), child: Container(color: const Color(0xFF2FA968))),
-              ]),
+              child: Row(
+                children: [
+                  Expanded(
+                    flex: (100 - overPct).clamp(1, 99),
+                    child: Container(color: const Color(0xFF8B6FE0)),
+                  ),
+                  SizedBox(width: 2 * s),
+                  Expanded(
+                    flex: overPct.clamp(1, 99),
+                    child: Container(color: const Color(0xFF2FA968)),
+                  ),
+                ],
+              ),
             ),
           ),
         ],
@@ -472,10 +586,12 @@ class JerseyIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => SizedBox(
-        width: size,
-        height: size * 1.1,
-        child: Center(child: Jersey(spec: spec, width: size)),
-      );
+    width: size,
+    height: size * 1.1,
+    child: Center(
+      child: Jersey(spec: spec, width: size),
+    ),
+  );
 }
 
 /// Collection grid tile.
@@ -503,12 +619,16 @@ class CardTile extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Container(height: 1, color: const Color(0xFFCBD3DB), margin: const EdgeInsets.only(bottom: 6)),
-            Row(children: [
-              Text(tierLabel.toUpperCase(),
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, letterSpacing: 1.2, color: Finish.accent(finish))),
-              const Spacer(),
-              Icon(Icons.check, size: 14, color: Finish.accent(finish)),
-            ]),
+            Row(
+              children: [
+                Text(
+                  tierLabel.toUpperCase(),
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, letterSpacing: 1.2, color: Finish.accent(finish)),
+                ),
+                const Spacer(),
+                Icon(Icons.check, size: 14, color: Finish.accent(finish)),
+              ],
+            ),
             const SizedBox(height: 4),
             Text(progress, style: const TextStyle(fontSize: 11.5, color: C.ink, height: 1.3)),
           ],

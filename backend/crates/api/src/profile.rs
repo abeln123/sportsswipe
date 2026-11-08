@@ -165,6 +165,7 @@ async fn teams(State(state): State<AppState>, _: AuthUser, Query(q): Query<Teams
 }
 
 async fn collection(State(state): State<AppState>, user: AuthUser) -> ApiResult<Json<Value>> {
+    let presentation:Vec<i64>=sqlx::query_scalar("SELECT player_id FROM presentation_entitlements WHERE user_id=$1").bind(user.id).fetch_all(&state.pool).await?;
     let total: i64 = sqlx::query_scalar("SELECT count(*) FROM card_series").fetch_one(&state.pool).await?;
     let owned: Vec<(i64, i64, Option<String>)> = sqlx::query_as(
         r#"SELECT mt.player_id, mt.correct_count, ef.finish FROM mastery_totals mt
@@ -188,7 +189,7 @@ async fn collection(State(state): State<AppState>, user: AuthUser) -> ApiResult<
     Ok(Json(json!({
         "series": "Debut Series", "collected": owned.len(), "total": total,
         "cards": owned.iter().map(|(pid, count, finish)| json!({
-            "card": specs.get(pid), "mastery": ss_db::cards::mastery_json(*count),
+            "card": specs.get(pid), "mastery": ss_db::cards::mastery_json(*count), "presentation":user.is_admin&&presentation.contains(pid),
             "finish": finish.clone().unwrap_or_else(|| "base".into()),
         })).collect::<Vec<_>>(),
         "unassignedFinishes": unassigned.iter().map(|(f, n)| json!({ "finish": f, "count": n })).collect::<Vec<_>>(),

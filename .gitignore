@@ -6,3 +6,10 @@ app/build/
 app/.dart_tool/
 app/test/failures/
 .DS_Store
+
+collectibles/node_modules/
+collectibles/.env
+collectibles/.keys/
+app/web/collectibles/app.js
+
+app/web/collectibles/wallet.js

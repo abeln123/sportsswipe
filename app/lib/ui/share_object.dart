@@ -115,20 +115,26 @@ class SharedObject extends StatelessWidget {
     final p = (item['payload'] as Map).cast<String, dynamic>();
     final spec = p['card'] == null ? null : CardSpec.fromJson((p['card'] as Map).cast<String, dynamic>());
     return InkWell(
-      onTap: () => showSheet<void>(
-        context,
-        (_) => item['kind'] == 'research'
-            ? ResearchReport(p, snapshot: true)
-            : Column(
-                children: [
-                  if (spec != null) SportCard(spec: spec, width: 280, finish: p['finish'] as String? ?? 'base'),
-                  const SizedBox(height: 12),
-                  Text(p['title']?.toString() ?? 'Shared card', style: T.h2),
-                  for (final l in (p['legs'] as List? ?? []))
-                    Text('${l['side']} ${l['line']} ${l['statLabel']} · ${l['result'] ?? 'Final'}', style: T.body),
-                ],
-              ),
-      ),
+      onTap: () {
+        if (item['kind'] == 'head_to_head') {
+          context.go('/duel/${p['token']}');
+          return;
+        }
+        showSheet<void>(
+          context,
+          (_) => item['kind'] == 'research'
+              ? ResearchReport(p, snapshot: true)
+              : Column(
+                  children: [
+                    if (spec != null) SportCard(spec: spec, width: 280, finish: p['finish'] as String? ?? 'base'),
+                    const SizedBox(height: 12),
+                    Text(p['title']?.toString() ?? 'Shared card', style: T.h2),
+                    for (final l in (p['legs'] as List? ?? []))
+                      Text('${l['side']} ${l['line']} ${l['statLabel']} · ${l['result'] ?? 'Final'}', style: T.body),
+                  ],
+                ),
+        );
+      },
       child: Container(
         margin: const EdgeInsets.only(top: 8),
         padding: const EdgeInsets.all(12),
