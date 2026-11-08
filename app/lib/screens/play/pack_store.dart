@@ -298,17 +298,26 @@ class _PackStoreState extends ConsumerState<PackStore> {
         scrollCacheExtent: const ScrollCacheExtent.pixels(180),
         slivers: [
           SliverPadding(
-            padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
             sliver: SliverList.list(
               children: [
                 const Text('Packs', style: T.h1),
-                const SizedBox(height: 4),
-                const Text('Open a pack and swipe every card. Results settle after each game.', style: T.dim),
-                if (leftovers > 0) ...[const SizedBox(height: 16), _LeftoverStrip(count: leftovers, onPlay: _leftovers)],
-                for (final c in challenges) ...[const SizedBox(height: 12), _ChallengeRow(c.cast<String, dynamic>())],
-                for (final p in featured) ...[
+                if (leftovers > 0) ...[
                   const SizedBox(height: 18),
-                  _FeaturedPack(offer: p, sheen: _sheen, onTap: p.soldOut ? null : () => _buy(p)),
+                  const Text('LEFTOVER CARDS', style: T.label),
+                  const SizedBox(height: 10),
+                  _LeftoverStrip(count: leftovers, onPlay: _leftovers),
+                ],
+                for (final c in challenges) ...[const SizedBox(height: 16), _ChallengeRow(c.cast<String, dynamic>())],
+                if (featured.isNotEmpty) ...[
+                  const SizedBox(height: 22),
+                  const Text('CHALLENGE PACK', style: T.label),
+                  const SizedBox(height: 12),
+                  for (final p in featured)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: _FeaturedPack(offer: p, sheen: _sheen, onTap: p.soldOut ? null : () => _buy(p)),
+                    ),
                 ],
                 const SizedBox(height: 22),
                 const Text('10-COIN PACKS', style: T.label),
@@ -321,23 +330,19 @@ class _PackStoreState extends ConsumerState<PackStore> {
             SliverPadding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               sliver: SliverList.list(
-                children: [
-                  const SizedBox(height: 28),
-                  const Text('TEAM PACKS · 50 COINS', style: T.label),
-                  const SizedBox(height: 6),
-                  const Text('Choose your team. Five cards from all positions and game lines.', style: T.small),
-                  const SizedBox(height: 12),
+                children: const [
+                  SizedBox(height: 28),
+                  Text('TEAM PACKS · 50 COINS', style: T.label),
+                  SizedBox(height: 12),
                 ],
               ),
             ),
-            SliverPadding(padding: const EdgeInsets.symmetric(horizontal: 16), sliver: _grid(teams)),
-          ],
-          const SliverPadding(
-            padding: EdgeInsets.fromLTRB(16, 16, 16, 28),
-            sliver: SliverToBoxAdapter(
-              child: Text('Availability is shared across packs. Cards you own or have played are never dealt again.', style: T.small),
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 28),
+              sliver: _grid(teams),
             ),
-          ),
+          ] else
+            const SliverToBoxAdapter(child: SizedBox(height: 28)),
         ],
       ),
     );
@@ -389,8 +394,7 @@ class _PackTile extends StatelessWidget {
             ),
             const SizedBox(height: 10),
             Text(offer.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: T.h3),
-            Text(offer.tagline, maxLines: 2, overflow: TextOverflow.ellipsis, style: T.small),
-            const SizedBox(height: 6),
+            const SizedBox(height: 4),
             _Price(price: offer.price, soldOut: onTap == null),
             Text('${offer.packsRemaining} packs left · ${offer.size} cards each', style: T.small),
           ],
@@ -437,56 +441,45 @@ class _FeaturedPack extends StatelessWidget {
     excludeSemantics: true,
     child: GestureDetector(
       onTap: onTap,
+      behavior: HitTestBehavior.opaque,
       child: Opacity(
         opacity: onTap == null ? 0.45 : 1,
-        child: Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: C.surface,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: offer.colors.last.withValues(alpha: 0.6)),
-          ),
-          child: Row(
-            children: [
-              AnimatedBuilder(
-                animation: sheen,
-                builder: (context, _) => offer.art(width: 108, sheen: sheen.value),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('CHALLENGE', style: T.label),
-                    const SizedBox(height: 4),
-                    Text(offer.name, style: T.h2),
-                    const SizedBox(height: 6),
-                    Text(offer.tagline, style: T.dim),
-                    const SizedBox(height: 10),
-                    Text.rich(
-                      TextSpan(
-                        style: const TextStyle(fontSize: 13.5, color: C.text),
-                        children: [
-                          TextSpan(
-                            text: 'Hit ${offer.targetPct}%',
-                            style: const TextStyle(fontWeight: FontWeight.w700),
-                          ),
-                          TextSpan(text: ' of ${offer.size} picks → '),
-                          TextSpan(
-                            text: '${f.coins(offer.payout)} coins',
-                            style: const TextStyle(fontWeight: FontWeight.w700),
-                          ),
-                        ],
-                      ),
+        child: Row(
+          children: [
+            AnimatedBuilder(
+              animation: sheen,
+              builder: (context, _) => offer.art(width: 118, sheen: sheen.value),
+            ),
+            const SizedBox(width: 18),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(offer.name, style: T.h3.copyWith(fontSize: 18)),
+                  const SizedBox(height: 6),
+                  Text.rich(
+                    TextSpan(
+                      style: const TextStyle(fontSize: 13.5, color: C.text),
+                      children: [
+                        TextSpan(
+                          text: 'Hit ${offer.targetPct}%',
+                          style: const TextStyle(fontWeight: FontWeight.w700, color: C.green),
+                        ),
+                        TextSpan(text: ' of ${offer.size} picks → '),
+                        TextSpan(
+                          text: '${f.coins(offer.payout)} coins',
+                          style: const TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 10),
-                    _Price(price: offer.price, soldOut: onTap == null),
-                    Text('${offer.packsRemaining} packs left · ${offer.size} cards each', style: T.small),
-                  ],
-                ),
+                  ),
+                  const SizedBox(height: 8),
+                  _Price(price: offer.price, soldOut: onTap == null),
+                  Text('${offer.packsRemaining} packs left · ${offer.size} cards each', style: T.small),
+                ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     ),
@@ -505,41 +498,38 @@ class _LeftoverStrip extends StatelessWidget {
     excludeSemantics: true,
     child: GestureDetector(
       onTap: onPlay,
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
-        decoration: BoxDecoration(
-          color: C.surface,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: C.line),
-        ),
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
         child: Row(
           children: [
             SizedBox(
-              width: 46,
-              height: 44,
+              width: 52,
+              height: 50,
               child: Stack(
                 children: [
                   for (var i = 0; i < 3; i++)
                     Positioned(
-                      left: i * 7.0,
+                      left: i * 8.0,
                       top: (2 - i) * 2.0,
-                      child: Transform.rotate(angle: (i - 1) * 0.12, child: const CardBack(width: 28)),
+                      child: Transform.rotate(angle: (i - 1) * 0.12, child: const CardBack(width: 30)),
                     ),
                 ],
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 16),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text('Leftover cards', style: T.h3),
-                  Text('$count from your packs, still open', style: T.small),
+                  const SizedBox(height: 2),
+                  Text('$count unplayed ${count == 1 ? 'card' : 'cards'}', style: T.small),
                 ],
               ),
             ),
-            const Text('Swipe', style: TextStyle(fontWeight: FontWeight.w700)),
-            const Icon(Icons.chevron_right_rounded, color: C.dim),
+            const Text('Swipe', style: TextStyle(fontWeight: FontWeight.w700, color: C.green)),
+            const Icon(Icons.chevron_right_rounded, color: C.green),
           ],
         ),
       ),
@@ -558,12 +548,8 @@ class _ChallengeRow extends StatelessWidget {
     final picked = (c['picked'] as num?)?.toInt() ?? 0;
     final target = (c['targetPct'] as num?)?.toInt() ?? 80;
     final need = (size * target / 100).ceil();
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: C.line),
-      ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

@@ -170,13 +170,6 @@ class _SellCollectibleState extends State<SellCollectibleScreen> {
         Text(widget.presentation ? 'ADMIN · PRESENTATION SALE' : 'DIAMOND EDITION', style: T.label),
         const SizedBox(height: 8),
         Text(sold ? 'Sale complete.' : 'Sell your Diamond.', style: T.h1),
-        const SizedBox(height: 8),
-        Text(
-          widget.presentation
-              ? 'A dedicated demo buyer offers 0.1 devnet SOL. This is test currency. You still approve the transfer.'
-              : 'List an edition for devnet SOL. A buyer must agree and sign before a sale can complete.',
-          style: T.dim,
-        ),
         const SizedBox(height: 18),
         if (spec != null)
           Center(

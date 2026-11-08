@@ -69,7 +69,7 @@ class _ResearchReportState extends State<ResearchReport> {
         const SizedBox(height: 22),
         Text(
           focusLine ? '$above of ${games.length} games' : '${f.line(average)} $unit per game',
-          style: const TextStyle(fontFamily: kCondensed, fontSize: 38, fontWeight: FontWeight.w800, height: 1.05, color: C.text),
+          style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w800, height: 1.1, color: C.text),
         ),
         const SizedBox(height: 8),
         Text(focusLine ? 'Finished above ${f.line(line)} ${a['statLabel'].toString().toLowerCase()}.' : insight, style: T.dim),
@@ -187,8 +187,6 @@ class _ResearchReportState extends State<ResearchReport> {
         ),
         if (_method) ...[
           Text(a['definition'] as String, style: T.small),
-          const SizedBox(height: 6),
-          const Text('Past results describe this sample; they are not a probability for the next game.', style: T.small),
           for (final s in (a['sources'] as List).cast<Map<String, dynamic>>())
             TextButton(onPressed: () => launchUrl(Uri.parse(s['url'] as String)), child: Text(s['label'] as String)),
         ],

@@ -65,10 +65,6 @@ class _ContestHubState extends ConsumerState<ContestHub> {
           color: C.green,
           child: ListView(padding: const EdgeInsets.fromLTRB(20, 18, 20, 32), children: [
             const Text('Weekly contest', style: T.h1),
-            const SizedBox(height: 6),
-            const Text('10 daily picks · best 5 days count', style: T.dim),
-            const SizedBox(height: 10),
-            Text('Practice contest · ${c['entrants']} entrants this week · no cash prizes', style: T.small),
             const SizedBox(height: 18),
             ..._today(today),
             const Hr(v: 26),
@@ -114,41 +110,23 @@ class _ContestHubState extends ConsumerState<ContestHub> {
             }),
             if (_showStandings) _standingsView(),
             const Hr(v: 22),
-            const Text('Prizes & rules', style: T.h2),
+            const Text('Prizes', style: T.h2),
             const SizedBox(height: 14),
-            Row(children: [
-              const Text('\$1,500', style: TextStyle(fontSize: 34, fontWeight: FontWeight.w800)),
-              const SizedBox(width: 16),
-              const Expanded(
-                child: Text('Example weekly pool · 60 prize positions\nNo funded prizes in this preview', style: T.small),
-              ),
-            ]),
-            const SizedBox(height: 12),
-            _disclosure('Fixed prize schedule · example', _showPrizes, () => setState(() => _showPrizes = !_showPrizes)),
+            const Text('\$1,500', style: TextStyle(fontSize: 34, fontWeight: FontWeight.w800)),
+            const SizedBox(height: 8),
+            _disclosure('Prize breakdown', _showPrizes, () => setState(() => _showPrizes = !_showPrizes)),
             if (_showPrizes)
               const Padding(
                 padding: EdgeInsets.only(left: 16, bottom: 8),
                 child: Text(
-                  '1st \$300 · 2nd \$150 · 3rd \$100 · 4th–10th \$40 · 11th–60th \$13.60\n'
-                  'Example only. No entry fee, no cash awards, no withdrawals.',
+                  '1st \$300 · 2nd \$150 · 3rd \$100 · 4th–10th \$40 · 11th–60th \$13.60',
                   style: T.dim,
                 ),
               ),
-            const SizedBox(height: 8),
-            const Text(
-              'Rules: each day has up to 10 questions on real NFL and NBA lines. One point per correct call. '
-              'Your best 5 days count toward the weekly total. Ties break on points, then days counted, then '
-              'the closest tiebreaker prediction. Entries lock at the first game of the day.',
-              style: T.dim,
-            ),
             if (isAdmin) ...[
               const Hr(v: 22),
               _disclosure('Demo controls', _showDemo, () => setState(() => _showDemo = !_showDemo)),
               if (_showDemo) ...[
-                const Text(
-                  'Settles today\'s questions with injected final stat values through the same grading path the worker uses.',
-                  style: T.small,
-                ),
                 const SizedBox(height: 10),
                 if (today != null && (today['questionCount'] as num) > 0)
                   PrimaryButton('Settle today\'s contest day', busy: _settling, onPressed: () => _settleDay((today['dayId'] as num).toInt())),
@@ -174,10 +152,10 @@ class _ContestHubState extends ConsumerState<ContestHub> {
       const SizedBox(height: 8),
       Text(
         switch (status) {
-          'upcoming' => 'Today\'s slate is not published yet. It opens once lines are set for today\'s games.',
+          'upcoming' => 'Today\'s slate is not published yet.',
           'unavailable' => 'Not enough games today for a contest slate.',
           _ when entered => 'Your entry is locked${d['points'] != null ? ' · ${d['points']} points' : ''}.',
-          'open' => 'Make ${d['questionCount']} predictions and one tiebreaker prediction. Entry is free.',
+          'open' => '${d['questionCount']} predictions + tiebreaker',
           'graded' => 'Today is graded.',
           _ => 'Today is locked.',
         },
@@ -191,7 +169,7 @@ class _ContestHubState extends ConsumerState<ContestHub> {
       if (lock != null) ...[
         const SizedBox(height: 10),
         Text(
-          lock.isAfter(DateTime.now()) ? 'Locks at ${f.dayTime(lock)} · first game of the day.' : 'Locked at ${f.dayTime(lock)}.',
+          lock.isAfter(DateTime.now()) ? 'Locks ${f.dayTime(lock)}' : 'Locked ${f.dayTime(lock)}',
           style: T.dim,
         ),
       ],

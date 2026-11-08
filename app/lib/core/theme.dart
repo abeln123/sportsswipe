@@ -46,11 +46,29 @@ ThemeData buildTheme() {
       labelStyle: TextStyle(color: C.dim),
       hintStyle: TextStyle(color: C.faint),
     ),
-    snackBarTheme: const SnackBarThemeData(
-      backgroundColor: Color(0xFF1E3A2E),
-      contentTextStyle: TextStyle(color: C.text, fontWeight: FontWeight.w600, fontFamily: 'Inter'),
+    textButtonTheme: TextButtonThemeData(
+      style: TextButton.styleFrom(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+      ),
+    ),
+    outlinedButtonTheme: OutlinedButtonThemeData(
+      style: OutlinedButton.styleFrom(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+      ),
+    ),
+    elevatedButtonTheme: ElevatedButtonThemeData(
+      style: ElevatedButton.styleFrom(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+      ),
+    ),
+    snackBarTheme: SnackBarThemeData(
+      backgroundColor: const Color(0xFF1E3A2E),
+      contentTextStyle: const TextStyle(color: C.text, fontWeight: FontWeight.w600, fontFamily: 'Inter'),
       behavior: SnackBarBehavior.floating,
-      shape: RoundedRectangleBorder(side: BorderSide(color: Color(0xFF3B5A4C))),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(6),
+        side: const BorderSide(color: Color(0xFF3B5A4C)),
+      ),
     ),
   );
 }

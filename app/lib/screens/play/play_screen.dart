@@ -70,6 +70,7 @@ class _PlayScreenState extends ConsumerState<PlayScreen> with SingleTickerProvid
         if (!cards) navigation,
         Expanded(
           child: Stack(
+            clipBehavior: Clip.hardEdge,
             children: [
               const Positioned.fill(child: PineBackdrop()),
               Positioned.fill(
@@ -119,7 +120,7 @@ class _PlayScreenState extends ConsumerState<PlayScreen> with SingleTickerProvid
   }
 }
 
-/// Primary mode tabs with a compact inline sport pill switcher.
+/// Primary mode tabs with underlined sport tabs on the right.
 class PlayNavigation extends StatelessWidget {
   const PlayNavigation({super.key, required this.mode, required this.onSelect});
   final PlayMode mode;
@@ -157,48 +158,35 @@ class _SportFilter extends StatelessWidget {
   static const _items = [('all', 'All sports'), ('nfl', 'NFL'), ('nba', 'NBA')];
 
   @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(2),
-    decoration: BoxDecoration(
-      color: C.surface,
-      borderRadius: BorderRadius.circular(18),
-      border: Border.all(color: C.line),
-    ),
-    child: Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        for (final (key, label) in _items)
-          Semantics(
-            button: true,
-            selected: sport == key,
-            child: InkWell(
-              borderRadius: BorderRadius.circular(15),
-              onTap: () => onChanged(key),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 160),
-                curve: Curves.easeOutCubic,
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-                decoration: BoxDecoration(
-                  color: sport == key ? const Color(0xFF1A3A30) : Colors.transparent,
-                  borderRadius: BorderRadius.circular(15),
-                  border: Border.all(
-                    color: sport == key ? C.green.withValues(alpha: 0.55) : Colors.transparent,
-                  ),
+  Widget build(BuildContext context) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      for (var i = 0; i < _items.length; i++)
+        Semantics(
+          button: true,
+          selected: sport == _items[i].$1,
+          child: InkWell(
+            onTap: () => onChanged(_items[i].$1),
+            child: Container(
+              padding: EdgeInsets.fromLTRB(i == 0 ? 4 : 6, 12, i == _items.length - 1 ? 2 : 6, 10),
+              margin: EdgeInsets.only(left: i == 0 ? 0 : 4),
+              decoration: BoxDecoration(
+                border: Border(
+                  bottom: BorderSide(color: sport == _items[i].$1 ? C.green : Colors.transparent, width: 2),
                 ),
-                child: Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: sport == key ? FontWeight.w700 : FontWeight.w500,
-                    color: sport == key ? C.green : C.dim,
-                    height: 1.1,
-                  ),
+              ),
+              child: Text(
+                _items[i].$2,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: sport == _items[i].$1 ? FontWeight.w700 : FontWeight.w500,
+                  color: sport == _items[i].$1 ? C.green : C.dim,
                 ),
               ),
             ),
           ),
-      ],
-    ),
+        ),
+    ],
   );
 }
 
@@ -216,6 +204,8 @@ class _PinePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    canvas.save();
+    canvas.clipRect(Offset.zero & size);
     final w = size.width, h = size.height;
     canvas.drawRect(Offset.zero & size, Paint()..color = const Color(0xFF0A1C17));
     void cut(Offset anchor, double thickness, Color color) {
@@ -228,6 +218,7 @@ class _PinePainter extends CustomPainter {
 
     cut(Offset(w * 1.02, h * 0.10), w * 0.52, const Color(0xFF0F2820));
     cut(Offset(w * 1.18, h * 0.44), w * 0.30, const Color(0xFF0D241D));
+    canvas.restore();
   }
 
   @override

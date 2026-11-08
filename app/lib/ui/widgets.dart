@@ -18,7 +18,12 @@ class PrimaryButton extends StatelessWidget {
     final enabled = onPressed != null && !busy;
     return Container(
       padding: focusRing ? const EdgeInsets.all(3) : EdgeInsets.zero,
-      decoration: focusRing ? BoxDecoration(border: Border.all(color: C.green, width: 1.5)) : null,
+      decoration: focusRing
+          ? BoxDecoration(
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: C.green, width: 1.5),
+            )
+          : null,
       child: SizedBox(
         width: double.infinity,
         height: 52,
@@ -27,7 +32,7 @@ class PrimaryButton extends StatelessWidget {
           style: TextButton.styleFrom(
             backgroundColor: enabled ? C.green : C.disabled,
             foregroundColor: enabled ? const Color(0xFF0D2416) : C.dim,
-            shape: const RoundedRectangleBorder(),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
             textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16, fontFamily: 'Inter'),
           ),
           child: busy
@@ -50,7 +55,10 @@ class GhostButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) => TextButton(
         onPressed: onPressed,
-        style: TextButton.styleFrom(foregroundColor: color, shape: const RoundedRectangleBorder()),
+        style: TextButton.styleFrom(
+          foregroundColor: color,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+        ),
         child: Text(label, style: TextStyle(fontSize: 15, fontWeight: bold ? FontWeight.w700 : FontWeight.w500)),
       );
 }
@@ -89,12 +97,13 @@ class UnderTabs extends StatelessWidget {
     return Container(
       decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: C.line))),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           for (var i = 0; i < labels.length; i++)
             InkWell(
               onTap: () => onChanged(i),
               child: Container(
-                padding: EdgeInsets.fromLTRB(compact ? 2 : 6, 12, compact ? 8 : 14, 10),
+                padding: EdgeInsets.fromLTRB(compact ? 2 : 6, 12, compact ? 6 : 14, 10),
                 margin: EdgeInsets.only(right: compact ? 6 : 10),
                 decoration: BoxDecoration(
                   border: Border(bottom: BorderSide(color: i == index ? C.green : Colors.transparent, width: 2)),
@@ -102,7 +111,7 @@ class UnderTabs extends StatelessWidget {
                 child: Row(children: [
                   Text(labels[i],
                       style: TextStyle(
-                          fontSize: 15,
+                          fontSize: compact ? 14.5 : 15,
                           fontWeight: i == index ? FontWeight.w700 : FontWeight.w500,
                           color: i == index ? (counts == null ? C.green : C.text) : C.dim)),
                   if (counts != null) ...[
@@ -112,16 +121,8 @@ class UnderTabs extends StatelessWidget {
                 ]),
               ),
             ),
-          if (trailing != null) ...[
-            const SizedBox(width: 8),
-            Expanded(
-              child: Align(
-                alignment: Alignment.centerRight,
-                child: FittedBox(fit: BoxFit.scaleDown, child: trailing),
-              ),
-            ),
-          ] else
-            const Spacer(),
+          const Spacer(),
+          if (trailing != null) trailing!,
         ],
       ),
     );
@@ -129,17 +130,19 @@ class UnderTabs extends StatelessWidget {
 }
 
 class PageTitle extends StatelessWidget {
-  const PageTitle(this.title, this.subtitle, {super.key});
+  const PageTitle(this.title, [this.subtitle, Key? key]) : super(key: key);
   final String title;
-  final String subtitle;
+  final String? subtitle;
 
   @override
   Widget build(BuildContext context) => Padding(
         padding: const EdgeInsets.only(top: 18, bottom: 14),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(title, style: T.h1),
-          const SizedBox(height: 6),
-          Text(subtitle, style: T.dim),
+          if (subtitle != null && subtitle!.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(subtitle!, style: T.dim),
+          ],
         ]),
       );
 }

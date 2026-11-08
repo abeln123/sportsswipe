@@ -144,8 +144,6 @@ class _ChallengeShareState extends State<_ChallengeShare> {
           Expanded(child: _detail('10 PICKS', 'Same cards. Same lines.')),
         ],
       ),
-      const SizedBox(height: 12),
-      const Text('Most correct wins. Closest total points breaks a tie. No coins at stake.', style: T.small),
       if (_error != null)
         Padding(
           padding: const EdgeInsets.only(top: 16),
@@ -167,8 +165,6 @@ class _ChallengeShareState extends State<_ChallengeShare> {
           const SizedBox(height: 12),
         ],
         PrimaryButton('Create invite link', busy: _busy, onPressed: _busy ? null : () => _send()),
-        const SizedBox(height: 12),
-        const Text('Your friend can join in a browser. No download needed.', style: T.small, textAlign: TextAlign.center),
       ] else ...[
         const Text('INVITATION READY', style: T.label),
         const SizedBox(height: 10),

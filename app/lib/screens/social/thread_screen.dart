@@ -112,6 +112,7 @@ class _ThreadScreenState extends State<ThreadScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
         color: mine ? const Color(0xFF1E3A2E) : C.surface,
+        borderRadius: BorderRadius.circular(6),
         border: Border.all(color: failed ? C.danger : C.line),
       ),
       child: Column(
@@ -214,7 +215,10 @@ class _ThreadScreenState extends State<ThreadScreen> {
                 ),
               ),
               Container(
-                color: C.green,
+                decoration: BoxDecoration(
+                  color: C.green,
+                  borderRadius: BorderRadius.circular(6),
+                ),
                 child: IconButton(
                   onPressed: _send,
                   icon: const Icon(Icons.arrow_upward, color: C.bg),

@@ -135,8 +135,6 @@ class _ParlayDeckState extends ConsumerState<ParlayDeck> {
               Expanded(child: Text('Review $n-pick parlay', style: T.h1)),
               Text('${parlayMultiplier(n)}×', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: C.under)),
             ]),
-            const SizedBox(height: 10),
-            const Text('Every leg must be correct to earn a return.', style: T.dim),
             const SizedBox(height: 14),
             for (final l in [..._legs])
               Padding(
@@ -179,14 +177,8 @@ class _ParlayDeckState extends ConsumerState<ParlayDeck> {
                   const TextSpan(text: ' coins', style: TextStyle(fontSize: 14, color: C.dim)),
                 ])),
                 Text('+${f.coins(ret - stake)} net gain', style: const TextStyle(color: C.green, fontWeight: FontWeight.w700)),
-                const Text('Includes wager', style: T.small),
               ]),
             ]),
-            const Text('Tap amount to edit · − / + 25', style: T.small),
-            const SizedBox(height: 4),
-            Text(stake == 0 ? 'Free entry. Every leg must hit.' : 'A miss on any leg loses ${f.coins(stake)} coins.', style: T.dim),
-            const Hr(),
-            Text('Return includes your wager + ${legBonus * n} bonus coins. Parlays do not add contest points.', style: T.dim),
             const SizedBox(height: 22),
             PrimaryButton('Lock $n-leg parlay', onPressed: n >= 2 ? () => Navigator.pop(ctx, true) : null),
             const SizedBox(height: 6),
@@ -347,7 +339,7 @@ class _ParlayDeckState extends ConsumerState<ParlayDeck> {
           EmptyState(
             icon: Icons.layers_outlined,
             title: 'No open lines right now',
-            body: 'Parlays combine 2 to 5 predictions into one higher-multiplier entry. Check back when the next slate opens.',
+            body: 'Check back when the next slate opens.',
             action: GhostButton('Refresh lines', color: C.green, bold: true, onPressed: _reload),
           ),
         ],
@@ -366,14 +358,6 @@ class _ParlayDeckState extends ConsumerState<ParlayDeck> {
                       Text(full ? 'FIVE LEGS ADDED' : 'END OF DECK', style: T.label),
                       const SizedBox(height: 10),
                       Text(n >= 2 ? 'Review parlay' : 'Add one more leg', style: T.h1),
-                      const SizedBox(height: 10),
-                      Text(
-                        n >= 2
-                            ? 'Review your calls and choose one coin wager. Nothing is locked yet.'
-                            : 'A parlay needs at least two legs. Load more cards or tap your selected leg above to clear it.',
-                        style: T.dim,
-                        textAlign: TextAlign.center,
-                      ),
                       if (done && !full) ...[
                         const SizedBox(height: 12),
                         GhostButton('Load more cards', color: C.green, bold: true, onPressed: _reload),

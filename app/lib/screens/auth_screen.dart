@@ -55,18 +55,10 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final (title, intro, action) = switch (_mode) {
-      _Mode.quick => (
-          'Try Sports Swipe',
-          'Swipe Over or Under on real NFL and NBA player lines. You start with 1,000 free coins.',
-          'Start swiping',
-        ),
-      _Mode.signup => (
-          'Create your account',
-          'Make calls on NFL and NBA player lines. New accounts start with 1,000 free coins.',
-          'Create account',
-        ),
-      _Mode.login => ('Welcome back', 'Log in to see your picks and coins.', 'Log in'),
+    final (title, action) = switch (_mode) {
+      _Mode.quick => ('Try Sports Swipe', 'Start swiping'),
+      _Mode.signup => ('Create your account', 'Create account'),
+      _Mode.login => ('Welcome back', 'Log in'),
     };
     return Scaffold(
       body: SafeArea(
@@ -84,8 +76,10 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                 ]),
                 const SizedBox(height: 28),
                 Text(title, style: T.h1),
-                const SizedBox(height: 8),
-                Text(_fromInvite ? 'Sign up or log in to accept your league invite.' : intro, style: T.dim),
+                if (_fromInvite) ...[
+                  const SizedBox(height: 8),
+                  const Text('Sign up or log in to accept your league invite.', style: T.dim),
+                ],
                 const SizedBox(height: 22),
                 AutofillGroup(
                   child: Column(children: [
@@ -128,12 +122,6 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                   if (_mode != _Mode.signup) GhostButton('Sign up with a password', color: C.dim, onPressed: () => _switch(_Mode.signup)),
                   if (_mode != _Mode.login) GhostButton('Log in', color: C.dim, onPressed: () => _switch(_Mode.login)),
                 ]),
-                const SizedBox(height: 18),
-                const Text(
-                  'Coins are free and have no cash value. Results come from real NFL and NBA box scores.',
-                  style: T.small,
-                  textAlign: TextAlign.center,
-                ),
               ],
             ),
           ),

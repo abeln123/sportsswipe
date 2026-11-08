@@ -52,11 +52,6 @@ class _HeadToHeadInviteState extends ConsumerState<HeadToHeadInviteScreen> {
               const Text('SPORTS SWIPE · HEAD-TO-HEAD', style: T.label),
               const SizedBox(height: 18),
               Text('${d['creatorName']} challenged you.', style: T.h1),
-              const SizedBox(height: 10),
-              const Text(
-                '10 shared cards. Most correct wins. Closest total-points tiebreaker decides a tie. No coins, cash, or mastery rewards.',
-                style: T.dim,
-              ),
               const SizedBox(height: 20),
               Center(
                 child: SportCard(
@@ -180,7 +175,7 @@ class _HeadToHeadState extends State<HeadToHeadScreen> {
           const SizedBox(height: 6),
           const Text('Ten calls. One rival.', style: T.h1),
           const SizedBox(height: 8),
-          Text('${d['graded']} / 10 graded · No coins or mastery rewards', style: T.small),
+          Text('${d['graded']} / 10 graded', style: T.small),
           const SizedBox(height: 16),
           for (final p in people)
             Padding(
@@ -211,7 +206,7 @@ class _HeadToHeadState extends State<HeadToHeadScreen> {
           if (d['accepted'] != true)
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 10),
-              child: Text('Waiting for your opponent to accept. Your picks stay private until lock.', style: T.dim),
+              child: Text('Waiting for opponent to accept.', style: T.dim),
             ),
           if (!canPlay && !submitted && open && d['isCreator'] != true)
             TextButton(
@@ -270,7 +265,7 @@ class _HeadToHeadState extends State<HeadToHeadScreen> {
               decoration: const InputDecoration(labelText: 'Predicted combined total points'),
             ),
             const SizedBox(height: 16),
-            PrimaryButton('Submit 10 picks · no coins', busy: _busy, onPressed: _submit),
+            PrimaryButton('Submit 10 picks', busy: _busy, onPressed: _submit),
           ],
           if (submitted) ...[
             const SizedBox(height: 18),
@@ -337,7 +332,7 @@ class _HeadToHeadListState extends State<HeadToHeadList> {
             ListTile(
               contentPadding: EdgeInsets.zero,
               title: Text((m['people'] as List).map((p) => p['name']).join(' vs ')),
-              subtitle: Text('${m['status']} · ${m['graded']}/10 graded · no coins', style: T.small),
+              subtitle: Text('${m['status']} · ${m['graded']}/10 graded', style: T.small),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => context.go('/social/head-to-head/${m['id']}'),
             ),

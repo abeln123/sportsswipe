@@ -118,8 +118,6 @@ class _ContestEntryScreenState extends ConsumerState<ContestEntryScreen> {
     }
     final ok = await showSheet<bool>(context, (ctx) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           const Text('Review contest entry', style: T.h1),
-          const SizedBox(height: 8),
-          Text('Day ${(_slate!['dayIndex'] as num) + 1}. Your picks are final once submitted.', style: T.dim),
           const SizedBox(height: 14),
           for (final q in _qs)
             Padding(
@@ -138,8 +136,6 @@ class _ContestEntryScreenState extends ConsumerState<ContestEntryScreen> {
             const TextSpan(text: 'Tiebreaker prediction: ', style: T.dim),
             TextSpan(text: f.line(tb), style: const TextStyle(fontWeight: FontWeight.w800)),
           ])),
-          const SizedBox(height: 12),
-          const Text('Free practice entry. No cash award or withdrawal.', style: T.small),
           const SizedBox(height: 20),
           PrimaryButton('Lock entry · Free', focusRing: true, onPressed: () => Navigator.pop(ctx, true)),
           const SizedBox(height: 6),
@@ -181,13 +177,10 @@ class _ContestEntryScreenState extends ConsumerState<ContestEntryScreen> {
     if (s['open'] != true) {
       return TabPage(back: 'Weekly contest', children: [
         PageTitle('Day $day', 'This day is locked.'),
-        const Text('Entries close at the first game of the day.', style: T.dim),
       ]);
     }
     return TabPage(back: 'Weekly contest', children: [
-      PageTitle('Daily entry', 'Day $day · Practice contest'),
-      Text('Draft saved on this device · Not submitted', style: T.small),
-      const SizedBox(height: 12),
+      PageTitle('Day $day entry'),
       if (!_reviewing) ..._cardStep() else ..._review(),
     ]);
   }
@@ -215,21 +208,15 @@ class _ContestEntryScreenState extends ConsumerState<ContestEntryScreen> {
               width: math.min(c.maxWidth, 360),
               topLeft: 'WEEKLY CONTEST',
               topRight: '${f.two(q.no)} / ${f.two(_qs.length)}',
-              footer: const Padding(
-                padding: EdgeInsets.fromLTRB(16, 10, 16, 12),
-                child: Text('1 point for a correct prediction', style: TextStyle(fontSize: 12.5, color: C.ink)),
-              ),
             ),
           ),
         );
       }),
-      const Padding(
-        padding: EdgeInsets.symmetric(vertical: 12),
-        child: Center(child: Text('Swipe right for Over · left for Under', style: TextStyle(color: C.dim, fontSize: 13))),
-      ),
-      if (_answers.isNotEmpty) Align(alignment: Alignment.centerRight, child: ArrowLink('Review draft', onTap: () => setState(() => _reviewing = true))),
-      const SizedBox(height: 10),
-      const Text('Arrow keys work when the card is focused. No coin wager. Submit after reviewing every prediction.', style: T.dim),
+      if (_answers.isNotEmpty)
+        Padding(
+          padding: const EdgeInsets.only(top: 12),
+          child: Align(alignment: Alignment.centerRight, child: ArrowLink('Review draft', onTap: () => setState(() => _reviewing = true))),
+        ),
     ];
   }
 
@@ -267,7 +254,7 @@ class _ContestEntryScreenState extends ConsumerState<ContestEntryScreen> {
       const SizedBox(height: 18),
       const Text('Prediction tiebreaker', style: T.h3),
       const SizedBox(height: 4),
-      Text('${_slate!['tiebreakLabel'] ?? 'Combined total'}. Closest prediction breaks a points tie.', style: T.dim),
+      Text('${_slate!['tiebreakLabel'] ?? 'Combined total'}', style: T.dim),
       TextField(
         controller: _tiebreak,
         keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -276,7 +263,6 @@ class _ContestEntryScreenState extends ConsumerState<ContestEntryScreen> {
       ),
       const SizedBox(height: 24),
       PrimaryButton('Review and submit · Free', busy: _busy, onPressed: complete ? _submit : null),
-      if (!complete) const Padding(padding: EdgeInsets.only(top: 8), child: Text('Answer every prediction first.', style: T.small)),
     ];
   }
 

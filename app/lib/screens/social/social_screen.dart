@@ -44,14 +44,7 @@ class _SocialScreenState extends State<SocialScreen> {
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
         children: [
-          const SizedBox(height: 12),
-          const Text('YOUR PEOPLE', style: T.label),
-          const SizedBox(height: 6),
-          const Text(
-            'Better together.',
-            style: TextStyle(fontFamily: kCondensed, fontSize: 36, fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(height: 18),
+          const PageTitle('Social'),
           UnderTabs(labels: const ['Friends', 'Messages', 'Leagues'], index: _tab, onChanged: (i) => setState(() => _tab = i)),
           const SizedBox(height: 8),
           switch (_tab) {
@@ -250,8 +243,6 @@ class _FriendsTabState extends ConsumerState<_FriendsTab> {
                   ),
                   const SizedBox(height: 18),
                   const Text('Bring your game-day group.', style: T.h2),
-                  const SizedBox(height: 6),
-                  const Text('Share a card. Compare a call. Start with one friend.', style: T.dim),
                   const SizedBox(height: 16),
                   PrimaryButton('Invite a friend', busy: _inviting, onPressed: _invite),
                 ],
@@ -433,7 +424,7 @@ class _MessagesTabState extends State<_MessagesTab> {
                 if ((t['unread'] as num) > 0)
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                    color: C.green,
+                    decoration: BoxDecoration(color: C.green, borderRadius: BorderRadius.circular(4)),
                     child: Text(
                       '${t['unread']}',
                       style: const TextStyle(color: C.bg, fontWeight: FontWeight.w800, fontSize: 12),
@@ -451,23 +442,13 @@ class _MessagesTabState extends State<_MessagesTab> {
             if (dms.isEmpty)
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('A card starts a conversation.', style: T.h2),
-                    SizedBox(height: 8),
-                    Text('Share research or a settled pick with a friend. It lands right here.', style: T.dim),
-                  ],
-                ),
+                child: Text('No direct messages yet.', style: T.dim),
               ),
             for (final t in dms) row(t),
             const Hr(),
             const Text('League', style: T.h3),
             const SizedBox(height: 8),
-            if (leagues.isEmpty) ...[
-              const Text('Join or create a league to open its conversation.', style: T.dim),
-              ArrowLink('Go to Leagues', onTap: widget.onLeagues),
-            ],
+            if (leagues.isEmpty) ArrowLink('Go to Leagues', onTap: widget.onLeagues),
             for (final t in leagues) row(t),
           ],
         );
@@ -495,7 +476,6 @@ class _LeaguesTabState extends State<_LeaguesTab> {
         children: [
           const Text('Create a league', style: T.h1),
           const SizedBox(height: 8),
-          const Text('Invite friends by text. Standings use this week\'s contest points.', style: T.dim),
           TextField(
             controller: name,
             autofocus: true,
@@ -573,7 +553,7 @@ class _LeaguesTabState extends State<_LeaguesTab> {
             Center(child: GhostButton('Join with a code', onPressed: _join)),
             const Hr(),
             if (leagues.isEmpty)
-              const Text('Your own weekly rivalry. Bring friends into a league and follow the standings together.', style: T.dim),
+              const Text('No leagues yet.', style: T.dim),
             for (final l in leagues)
               InkWell(
                 onTap: () => context.go('/social/league/${l['leagueId']}'),

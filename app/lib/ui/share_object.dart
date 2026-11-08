@@ -74,7 +74,6 @@ class _ShareSheetState extends State<_ShareSheet> {
     children: [
       const Text('Send to your people', style: T.h2),
       const SizedBox(height: 8),
-      const Text('Add a thought. Give them something to call.', style: T.dim),
       TextField(
         controller: _comment,
         maxLength: 300,

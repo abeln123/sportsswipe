@@ -41,12 +41,6 @@ class _AdminScreenState extends ConsumerState<AdminScreen> {
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             decoration: const InputDecoration(labelText: 'Final stat value (blank = random near the line)'),
           ),
-          const SizedBox(height: 10),
-          const Text(
-            'Locks the market, records the value as a new result revision and runs the same grading function the worker uses. '
-            'Settling again with a different value regrades and credits only the difference.',
-            style: T.small,
-          ),
           const SizedBox(height: 18),
           PrimaryButton('Settle now', onPressed: () => Navigator.pop(ctx, true)),
           Center(child: GhostButton('Cancel', color: C.dim, onPressed: () => Navigator.pop(ctx, false))),
@@ -83,7 +77,7 @@ class _AdminScreenState extends ConsumerState<AdminScreen> {
   @override
   Widget build(BuildContext context) {
     return TabPage(back: 'Profile', onRefresh: () async => _reload(), children: [
-      const PageTitle('Demo controls', 'Settle a market with a final stat value'),
+      const PageTitle('Demo controls'),
       Row(children: [
         Expanded(
           child: TextField(
@@ -109,7 +103,6 @@ class _AdminScreenState extends ConsumerState<AdminScreen> {
         ),
       ]),
       const SizedBox(height: 8),
-      const Text('Markets with the most picks are listed first.', style: T.small),
       FutureBuilder(
         future: _data,
         builder: (context, snap) {

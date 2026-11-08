@@ -74,7 +74,7 @@ class _PicksScreenState extends ConsumerState<PicksScreen> {
       child: ListView(
         padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
         children: [
-          const PageTitle('My picks', 'Pending predictions and settled results'),
+          const PageTitle('My picks'),
           UnderTabs(
             labels: const ['Pending', 'Settled'],
             counts: [((s?['pendingCount'] as num?)?.toInt() ?? 0) + queued.length, (s?['settledCount'] as num?)?.toInt() ?? 0],
@@ -93,8 +93,6 @@ class _PicksScreenState extends ConsumerState<PicksScreen> {
                 Expanded(child: Labeled('Possible return', f.coins(s['possibleReturn'] as num))),
               ],
             ),
-            const SizedBox(height: 10),
-            const Text('Return if every entry wins. Wagers included.', style: T.dim),
           ],
           if (_tab == 0)
             for (final q in queued) _queuedRow(q),
@@ -418,8 +416,6 @@ Future<void> showResultsSheet(BuildContext context, WidgetRef ref) async {
             ),
           ],
         ),
-        const SizedBox(height: 16),
-        const Text('Credited to your balance. Winning returns include the wager.', style: T.dim, textAlign: TextAlign.center),
         if (newCards.isNotEmpty) ...[
           const SizedBox(height: 22),
           Row(
@@ -439,15 +435,9 @@ Future<void> showResultsSheet(BuildContext context, WidgetRef ref) async {
                 ),
               ),
               const SizedBox(width: 14),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '${newCards.length} new ${newCards.length == 1 ? 'card' : 'cards'} unlocked',
-                    style: const TextStyle(color: Color(0xFFD5F5C8), fontWeight: FontWeight.w700, fontSize: 16),
-                  ),
-                  const Text('Added to your collection', style: T.small),
-                ],
+              Text(
+                '${newCards.length} new ${newCards.length == 1 ? 'card' : 'cards'} unlocked',
+                style: const TextStyle(color: Color(0xFFD5F5C8), fontWeight: FontWeight.w700, fontSize: 16),
               ),
             ],
           ),

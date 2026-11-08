@@ -100,18 +100,11 @@ class _AiScreenState extends ConsumerState<AiScreen> {
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(20, 8, 8, 10),
+          padding: const EdgeInsets.fromLTRB(20, 14, 8, 6),
           child: Row(
             children: [
               const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('THE ANALYST', style: T.label),
-                    SizedBox(height: 4),
-                    Text('A closer look.', style: T.h1),
-                  ],
-                ),
+                child: Text('Analyst', style: T.h1),
               ),
               PopupMenuButton<String>(
                 tooltip: 'Conversation menu',
@@ -134,11 +127,9 @@ class _AiScreenState extends ConsumerState<AiScreen> {
               if (_turns.isEmpty) ...[
                 const Text(
                   'Start with a player.\nFollow the numbers.',
-                  style: TextStyle(fontFamily: kCondensed, fontSize: 34, fontWeight: FontWeight.w700, height: 1.05),
+                  style: T.h2,
                 ),
-                const SizedBox(height: 10),
-                const Text('Recent form, a matchup, or a line you’re considering.', style: T.dim),
-                const SizedBox(height: 24),
+                const SizedBox(height: 22),
                 const Text('FROM THE SLATE', style: T.label),
                 const SizedBox(height: 8),
                 FutureBuilder(
@@ -397,8 +388,6 @@ class _AnswerState extends ConsumerState<_Answer> {
                     padding: const EdgeInsets.only(top: 18),
                     child: Column(
                       children: [
-                        const Text('FREE PICK · NO COINS AT RISK', style: T.label),
-                        const SizedBox(height: 10),
                         Swipeable(
                           enabled: !_checking && _command == null,
                           verticalDrag: false,

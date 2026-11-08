@@ -82,8 +82,6 @@ class _InviteScreenState extends ConsumerState<InviteScreen> {
                         'Sign up to join',
                         onPressed: () => context.go('/login?next=${Uri.encodeComponent('/invite/${widget.token}')}'),
                       ),
-                      const SizedBox(height: 8),
-                      const Text('You will come back here after signing up.', style: T.small, textAlign: TextAlign.center),
                     ] else ...[
                       PrimaryButton(
                         p['kind'] == 'friend' ? 'Accept & say hello' : 'Join ${p['leagueName']}',

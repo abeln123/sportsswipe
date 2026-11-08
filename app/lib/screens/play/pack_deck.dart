@@ -153,13 +153,10 @@ class _PackDeckState extends ConsumerState<PackDeck> {
               ),
             ),
           ),
-          Center(child: Text('Includes your ${f.coins(stake)}-coin wager.', style: T.dim)),
           const SizedBox(height: 24),
           _row('Your wager', '${f.coins(stake)} coins'),
           const SizedBox(height: 12),
           _row('Balance after locking', '${f.coins(balance - stake)} coins'),
-          const SizedBox(height: 14),
-          Text('If incorrect, you lose ${f.coins(stake)} coins. Coins are always free and have no cash value.', style: T.small),
           const SizedBox(height: 22),
           PrimaryButton(
             'Lock ${card.market.pickText(side)} · ${f.coins(stake)} coins',
@@ -304,16 +301,9 @@ class _PackDeckState extends ConsumerState<PackDeck> {
                     '+${f.coins(ret - stake)} net gain',
                     style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: Color(0xFF1F8A4C)),
                   ),
-                  const Text('Includes wager', style: TextStyle(fontSize: 12, color: C.inkDim)),
                 ],
               ),
             ],
-          ),
-          const Text('Tap amount to edit · − / + 25', style: TextStyle(fontSize: 10.5, color: C.inkDim)),
-          const SizedBox(height: 4),
-          Text(
-            stake == 0 ? 'Free pick. No coins at risk.' : 'Wrong call loses ${f.coins(stake)} coins.',
-            style: const TextStyle(fontSize: 12.5, color: C.ink),
           ),
           Container(height: 1, color: const Color(0xFFCBD3DB), margin: const EdgeInsets.only(top: 8)),
           RecentForm(
@@ -372,14 +362,6 @@ class _PackDeckState extends ConsumerState<PackDeck> {
             ),
           ),
         ),
-        const SizedBox(height: 10),
-        Center(
-          child: Text(
-            n > 0 ? 'Results arrive after each game ends.' : 'You skipped every card. They wait in your leftovers.',
-            style: T.dim,
-            textAlign: TextAlign.center,
-          ),
-        ),
         const SizedBox(height: 16),
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -398,21 +380,6 @@ class _PackDeckState extends ConsumerState<PackDeck> {
               ),
           ],
         ),
-        if (widget.targetPct != null) ...[
-          const SizedBox(height: 18),
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              border: Border.all(color: C.line),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Text(
-              'Challenge: hit ${widget.targetPct}% of this pack to earn ${f.coins(widget.payout ?? 0)} coins. '
-              'Unplayed cards count as misses once their games lock.',
-              style: T.dim,
-            ),
-          ),
-        ],
         const SizedBox(height: 24),
         PrimaryButton('View My picks', onPressed: () => context.go('/picks')),
         const SizedBox(height: 8),

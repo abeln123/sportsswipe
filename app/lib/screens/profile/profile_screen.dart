@@ -69,12 +69,6 @@ class StatsBlock extends StatelessWidget {
             Expanded(child: _stat(f.coins(s['coinsReturned'] as num), 'Coins returned')),
           ],
         ),
-        const SizedBox(height: 16),
-        Text(
-          'Single picks and parlays count as one entry each. Returns include winning stakes. '
-          'Net settled coins: ${f.signed(s['netSettled'] as num)}. Cash awards: \$0 · No live payouts.',
-          style: T.dim,
-        ),
         const Hr(v: 22),
         const Text('Rankings', style: T.h3),
         const SizedBox(height: 12),
@@ -87,7 +81,7 @@ class StatsBlock extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         Text(
-          wc['rank'] == null ? 'No rank yet this week. Points come from graded contest days.' : 'Rank #${wc['rank']} this week.',
+          wc['rank'] == null ? 'No rank yet this week.' : 'Rank #${wc['rank']} this week.',
           style: T.dim,
         ),
         if (best != null && best['card'] != null) ...[
@@ -238,8 +232,10 @@ class _ProfileTabState extends ConsumerState<_ProfileTab> {
             ),
           ],
         ),
-        const SizedBox(height: 14),
-        Text(me.bio.isEmpty ? 'Add a short bio and your favorite team.' : me.bio, style: T.body),
+        if (me.bio.isNotEmpty) ...[
+          const SizedBox(height: 14),
+          Text(me.bio, style: T.body),
+        ],
         InkWell(
           onTap: () => _edit(me),
           child: const Padding(
@@ -320,10 +316,9 @@ class _CollectionTabState extends State<_CollectionTab> {
               label: Text(c['presentation'] == true ? 'Sell presentation Diamond' : 'Sell Diamond edition (devnet)'),
             ),
           if (c['presentation'] == true) const Text('ADMIN PRESENTATION · 400/400 demo grant', style: T.small),
+          const SizedBox(height: 8),
           const Text('Card finish', style: T.label),
-          const SizedBox(height: 6),
-          const Text('Finishes change appearance only. Mastery is earned separately.', style: T.dim),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
           for (final o in options)
             ListTile(
               contentPadding: EdgeInsets.zero,
@@ -370,23 +365,15 @@ class _CollectionTabState extends State<_CollectionTab> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const PageTitle('Collection', 'Player cards and earned mastery'),
+            const PageTitle('Collection'),
             Container(
-              padding: const EdgeInsets.symmetric(vertical: 16),
+              padding: const EdgeInsets.symmetric(vertical: 12),
               decoration: const BoxDecoration(
                 border: Border(bottom: BorderSide(color: C.line)),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              child: Row(
                 children: [
-                  const Text('DIAMOND EDITIONS · DEVNET', style: T.label),
-                  const SizedBox(height: 6),
-                  const Text('Your achievement. A collectible with a history.', style: T.h3),
-                  const SizedBox(height: 6),
-                  const Text(
-                    '400 correct free calls qualify. A sale transfers the edition; your mastery stays yours. Test SOL only.',
-                    style: T.small,
-                  ),
+                  const Expanded(child: Text('DIAMOND EDITIONS · DEVNET', style: T.label)),
                   TextButton.icon(
                     icon: const Icon(Icons.open_in_new, size: 16),
                     label: const Text('Open devnet collection'),
@@ -444,12 +431,6 @@ class _CollectionTabState extends State<_CollectionTab> {
             ),
             const SizedBox(height: 6),
             const Text('Player cards collected', style: T.h3),
-            const SizedBox(height: 8),
-            const Text(
-              'Earn a player\'s Base card with your first correct call. Keep getting that player right to reach Bronze, '
-              'Silver, Gold, and Diamond. Earned tiers change your card’s appearance. Store finishes let you customize it. Cards never redeem for money.',
-              style: T.dim,
-            ),
             Container(height: 2, color: C.green, margin: const EdgeInsets.symmetric(vertical: 18)),
             if (cards.isEmpty)
               const EmptyState(
@@ -580,7 +561,6 @@ class _CollectionCardViewState extends State<CollectionCardView> {
                   },
                   child: const Text('Change card finish'),
                 ),
-                if (demo) const Text('ADMIN DEMO · 400/400 grant · Devnet collectible', style: T.small, textAlign: TextAlign.center),
               ],
             ),
           ),
@@ -615,8 +595,6 @@ class _StoreTabState extends ConsumerState<_StoreTab> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text('Buy ${f.cap(finish)} finish', style: T.h1),
-          const SizedBox(height: 8),
-          Text('${f.coins(price)} coins. Apply it to any card you have earned. Cosmetic only; no cash value.', style: T.dim),
           const SizedBox(height: 20),
           PrimaryButton('Buy · ${f.coins(price)} coins', onPressed: () => Navigator.pop(ctx, true)),
           Center(
@@ -658,27 +636,18 @@ class _StoreTabState extends ConsumerState<_StoreTab> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const PageTitle('Card store', 'Cosmetic finishes for your collection'),
-            const Text('Cosmetic finishes · No cash value', style: T.dim),
-            const SizedBox(height: 18),
+            const PageTitle('Card store'),
+            const SizedBox(height: 6),
             Row(
               children: [
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Your free coins', style: T.small),
+                    const Text('Coins', style: T.small),
                     Text(
                       f.coins(balance),
                       style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: C.green),
                     ),
-                  ],
-                ),
-                const Spacer(),
-                const Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text('Earned mastery', style: T.small),
-                    Text('Never sold', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
                   ],
                 ),
               ],
@@ -719,13 +688,7 @@ class _StoreTabState extends ConsumerState<_StoreTab> {
                       ),
                       const SizedBox(width: 16),
                       Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(f.cap(s['finish'] as String), style: T.h3.copyWith(fontSize: 18)),
-                            const Text('Cosmetic · choose a player later', style: T.small),
-                          ],
-                        ),
+                        child: Text(f.cap(s['finish'] as String), style: T.h3.copyWith(fontSize: 18)),
                       ),
                       if (_busy == s['finish'])
                         const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: C.green))
@@ -748,12 +711,6 @@ class _StoreTabState extends ConsumerState<_StoreTab> {
                   ),
                 ),
               ),
-            const SizedBox(height: 14),
-            const Text(
-              'Finishes change appearance, not mastery. Earn each tier with correct calls: 20 for Bronze, '
-              '80 for Silver, 200 for Gold and 400 for Diamond. Coins have no cash value.',
-              style: T.small,
-            ),
           ],
         );
       },
