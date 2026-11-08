@@ -21,9 +21,20 @@ class Swipeable extends StatefulWidget {
     this.onSkip,
     this.onPullDown,
     this.onEngage,
+    this.onHold,
+    this.onPull,
     this.enabled = true,
     this.verticalDrag = true,
+    this.overLabel = 'OVER',
+    this.underLabel = 'UNDER',
   });
+
+  /// Downward pull distance while dragging (0 when released or sideways).
+  final ValueChanged<double>? onPull;
+
+  /// Stamp text shown as the card leans right and left.
+  final String overLabel;
+  final String underLabel;
 
   final Widget child;
   final void Function(String side) onSwipe;
@@ -32,6 +43,9 @@ class Swipeable extends StatefulWidget {
 
   /// Called when a drag starts.
   final VoidCallback? onEngage;
+
+  /// True while a finger is on the card.
+  final ValueChanged<bool>? onHold;
   final bool enabled;
 
   /// Off inside scrolling pages, where vertical drags must scroll.
@@ -85,6 +99,7 @@ class SwipeableState extends State<Swipeable> with SingleTickerProviderStateMixi
     _grabTop = d.localPosition.dy < _size.height / 2;
     HapticFeedback.selectionClick();
     widget.onEngage?.call();
+    widget.onHold?.call(true);
   }
 
   void _update(DragUpdateDetails d) {
@@ -94,15 +109,21 @@ class SwipeableState extends State<Swipeable> with SingleTickerProviderStateMixi
     // Pulling down is a gesture, not a throw: it gets heavier as it goes.
     if (_pos.dy + delta.dy > 0) delta = Offset(delta.dx, delta.dy * (1 / (1 + _pos.dy / 120)));
     setState(() => _pos += delta);
+    widget.onPull?.call(_pos.dy > 0 && _pos.dy > _pos.dx.abs() ? _pos.dy : 0);
     final armed = _intent(_pos);
     if (armed != _armed) {
-      armed == null ? HapticFeedback.selectionClick() : HapticFeedback.mediumImpact();
+      // One light tap where letting go would commit; none when backing out.
+      if (armed != null) HapticFeedback.lightImpact();
       _armed = armed;
     }
   }
 
   void _end(DragEndDetails d) {
-    if (_busy) return;
+    widget.onHold?.call(false);
+    if (_busy) {
+      widget.onPull?.call(0);
+      return;
+    }
     final v = d.velocity.pixelsPerSecond;
     _armed = null;
     final vertical = _vertical && _pos.dy.abs() > _pos.dx.abs();
@@ -126,6 +147,7 @@ class SwipeableState extends State<Swipeable> with SingleTickerProviderStateMixi
     } else {
       _springHome(v);
     }
+    widget.onPull?.call(0);
   }
 
   void _springHome(Offset velocity) {
@@ -209,7 +231,7 @@ class SwipeableState extends State<Swipeable> with SingleTickerProviderStateMixi
               if (upward && py > 0.12)
                 _stamp('SKIP', C.dim, py, 0, top: true)
               else if (px.abs() > 0.12)
-                _stamp(px > 0 ? 'OVER' : 'UNDER', px > 0 ? const Color(0xFF2FA968) : const Color(0xFF8B6FE0), px.abs(), px > 0 ? -0.25 : 0.25,
+                _stamp(px > 0 ? widget.overLabel : widget.underLabel, px > 0 ? const Color(0xFF2FA968) : const Color(0xFF8B6FE0), px.abs(), px > 0 ? -0.25 : 0.25,
                     left: px > 0),
             ]),
           ),
@@ -245,7 +267,7 @@ class SwipeableState extends State<Swipeable> with SingleTickerProviderStateMixi
 /// The top card scaled to fill the available space (never cut off), with
 /// the next card waiting behind it. When the top card is thrown, the next
 /// one rises into place.
-class CardStage extends StatelessWidget {
+class CardStage extends StatefulWidget {
   const CardStage({
     super.key,
     required this.swipeKey,
@@ -256,9 +278,16 @@ class CardStage extends StatelessWidget {
     this.onSkip,
     this.onPullDown,
     this.onEngage,
+    this.onPull,
+    this.coach = false,
     this.cardWidth = 340,
+    this.overLabel = 'OVER',
+    this.underLabel = 'UNDER',
   });
 
+  final ValueChanged<double>? onPull;
+  final String overLabel;
+  final String underLabel;
   final GlobalKey<SwipeableState> swipeKey;
   final Object topId;
   final Widget top;
@@ -268,28 +297,40 @@ class CardStage extends StatelessWidget {
   final VoidCallback? onPullDown;
   final VoidCallback? onEngage;
 
+  /// Shows the first-run "how to play" overlay on top of the card.
+  final bool coach;
+
   /// Width the card is laid out at before scaling to fit.
   final double cardWidth;
 
+  @override
+  State<CardStage> createState() => _CardStageState();
+}
+
+class _CardStageState extends State<CardStage> {
+  bool _held = false;
+
   Widget _fit(Widget card) => Center(
         child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: cardWidth * 1.3),
-          child: FittedBox(fit: BoxFit.contain, child: SizedBox(width: cardWidth, child: card)),
+          constraints: BoxConstraints(maxWidth: widget.cardWidth * 1.3),
+          child: FittedBox(fit: BoxFit.contain, child: SizedBox(width: widget.cardWidth, child: card)),
         ),
       );
 
   @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+  Widget build(BuildContext context) {
+    final still = MediaQuery.of(context).disableAnimations;
+    return Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
         child: Stack(children: [
-          if (next != null)
+          if (widget.next != null)
             Positioned.fill(
               child: IgnorePointer(
                 child: ExcludeSemantics(
                   child: RepaintBoundary(
                     child: Transform.translate(
                       offset: const Offset(0, 14),
-                      child: Transform.scale(scale: 0.92, child: Opacity(opacity: 0.45, child: _fit(next!))),
+                      child: Transform.scale(scale: 0.92, child: Opacity(opacity: 0.45, child: _fit(widget.next!))),
                     ),
                   ),
                 ),
@@ -297,101 +338,170 @@ class CardStage extends StatelessWidget {
             ),
           Positioned.fill(
             child: Swipeable(
-              key: swipeKey,
-              onSwipe: onSwipe,
-              onSkip: onSkip,
-              onPullDown: onPullDown,
-              onEngage: onEngage,
+              key: widget.swipeKey,
+              onSwipe: widget.onSwipe,
+              onSkip: widget.onSkip,
+              onPullDown: widget.onPullDown,
+              onEngage: widget.onEngage,
+              onPull: widget.onPull,
+              overLabel: widget.overLabel,
+              underLabel: widget.underLabel,
+              onHold: (h) {
+                if (h != _held) setState(() => _held = h);
+              },
               child: TweenAnimationBuilder<double>(
-                key: ValueKey(topId),
+                key: ValueKey(widget.topId),
                 tween: Tween(begin: 0, end: 1),
                 duration: const Duration(milliseconds: 260),
                 curve: Curves.easeOutCubic,
-                child: RepaintBoundary(child: _fit(top)),
-                builder: (context, t, child) => Transform.translate(
-                  offset: Offset(0, 14 * (1 - t)),
-                  child: Transform.scale(
-                    scale: 0.92 + 0.08 * t,
-                    child: Opacity(opacity: 0.45 + 0.55 * t, child: child),
-                  ),
-                ),
+                child: RepaintBoundary(child: _fit(widget.top)),
+                builder: (context, t, child) => still
+                    ? Opacity(opacity: t, child: child)
+                    : Transform.translate(
+                        offset: Offset(0, 14 * (1 - t)),
+                        child: Transform.scale(
+                          scale: 0.92 + 0.08 * t,
+                          child: Opacity(opacity: 0.45 + 0.55 * t, child: child),
+                        ),
+                      ),
+              ),
+            ),
+          ),
+          Positioned.fill(
+            child: IgnorePointer(
+              child: AnimatedOpacity(
+                opacity: widget.coach && !_held ? 1 : 0,
+                duration: Duration(milliseconds: widget.coach && !_held ? 260 : 140),
+                curve: Curves.easeOut,
+                child: widget.coach ? SwipeCoachOverlay(skip: widget.onSkip != null) : const SizedBox.shrink(),
               ),
             ),
           ),
         ]),
       );
+  }
 }
 
-/// Round buttons under the card for people who'd rather tap. They throw the
-/// card through [swipe] so taps animate and buzz like swipes.
-class SwipeButtons extends StatelessWidget {
-  const SwipeButtons({super.key, required this.swipe, this.hint, this.skipLabel = 'Skip'});
-  final GlobalKey<SwipeableState> swipe;
-  final String? hint;
-  final String skipLabel;
+/// First-run tutorial drawn over the card. It never takes touches, so the
+/// first real swipe goes straight to the card underneath.
+class SwipeCoachOverlay extends StatefulWidget {
+  const SwipeCoachOverlay({super.key, this.skip = true});
+  final bool skip;
 
   @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.only(top: 10, bottom: 6),
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          if (hint != null) ...[
-            Text(hint!, style: const TextStyle(color: C.dim, fontSize: 13)),
-            const SizedBox(height: 8),
-          ],
-          Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-            _RoundButton(label: 'Under', icon: Icons.arrow_back_rounded, color: C.under, onTap: () => swipe.currentState?.fling('under')),
-            const SizedBox(width: 22),
-            _RoundButton(label: skipLabel, icon: Icons.arrow_upward_rounded, color: C.dim, small: true, onTap: () => swipe.currentState?.fling('skip')),
-            const SizedBox(width: 22),
-            _RoundButton(label: 'Over', icon: Icons.arrow_forward_rounded, color: C.over, onTap: () => swipe.currentState?.fling('over')),
-          ]),
-        ]),
-      );
+  State<SwipeCoachOverlay> createState() => _SwipeCoachOverlayState();
 }
 
-class _RoundButton extends StatefulWidget {
-  const _RoundButton({required this.label, required this.icon, required this.color, required this.onTap, this.small = false});
-  final String label;
-  final IconData icon;
-  final Color color;
-  final VoidCallback onTap;
-  final bool small;
+class _SwipeCoachOverlayState extends State<SwipeCoachOverlay> with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 4200))..repeat();
 
   @override
-  State<_RoundButton> createState() => _RoundButtonState();
-}
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
 
-class _RoundButtonState extends State<_RoundButton> {
-  bool _down = false;
+  List<(String, String, IconData, Color, Offset)> get _moves => [
+        ('Swipe right', 'Over', Icons.arrow_forward_rounded, C.over, const Offset(1, 0)),
+        ('Swipe left', 'Under', Icons.arrow_back_rounded, C.under, const Offset(-1, 0)),
+        if (widget.skip) ('Swipe up', 'Skip', Icons.arrow_upward_rounded, C.dim, const Offset(0, -1)),
+      ];
 
   @override
   Widget build(BuildContext context) {
-    final size = widget.small ? 46.0 : 58.0;
-    return Semantics(
-      button: true,
-      label: widget.label,
-      excludeSemantics: true,
-      child: GestureDetector(
-        onTapDown: (_) => setState(() => _down = true),
-        onTapCancel: () => setState(() => _down = false),
-        onTapUp: (_) => setState(() => _down = false),
-        onTap: widget.onTap,
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          AnimatedScale(
-            scale: _down ? 0.88 : 1,
-            duration: const Duration(milliseconds: 90),
-            curve: Curves.easeOut,
-            child: Container(
-              width: size,
-              height: size,
-              decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: widget.color.withValues(alpha: 0.7), width: 1.5)),
-              child: Icon(widget.icon, color: widget.color, size: widget.small ? 20 : 24),
-            ),
-          ),
-          const SizedBox(height: 5),
-          Text(widget.label, style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: widget.color)),
-        ]),
+    final moves = _moves;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(18),
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [C.bg.withValues(alpha: 0.9), C.bg.withValues(alpha: 0.97)],
+        ),
+      ),
+      child: Center(
+        child: AnimatedBuilder(
+          animation: _c,
+          builder: (context, _) {
+            final phase = _c.value * moves.length;
+            final i = phase.floor() % moves.length;
+            final t = phase - phase.floor();
+            // Each beat: rest, glide out, hold, fade back.
+            final out = Curves.easeInOutCubic.transform(((t - 0.12) / 0.45).clamp(0.0, 1.0));
+            final back = ((t - 0.8) / 0.2).clamp(0.0, 1.0);
+            final move = moves[i];
+            final offset = move.$5 * 34 * out;
+            return Column(mainAxisSize: MainAxisSize.min, children: [
+              SizedBox(
+                height: 130,
+                width: 200,
+                child: Stack(alignment: Alignment.center, children: [
+                  Opacity(
+                    opacity: 1 - back,
+                    child: Transform.translate(
+                      offset: offset,
+                      child: Transform.rotate(
+                        angle: move.$5.dx * 0.18 * out,
+                        child: Container(
+                          width: 62,
+                          height: 86,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF2F4F6),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Color.lerp(Colors.white, move.$4, out)!, width: 2),
+                            boxShadow: const [BoxShadow(color: Color(0x66000000), blurRadius: 16, offset: Offset(0, 6))],
+                          ),
+                          child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                            Container(width: 30, height: 4, color: const Color(0xFFCBD3DB)),
+                            const SizedBox(height: 6),
+                            Container(width: 40, height: 4, color: const Color(0xFFCBD3DB)),
+                            const SizedBox(height: 6),
+                            Container(width: 22, height: 4, color: const Color(0xFFCBD3DB)),
+                          ]),
+                        ),
+                      ),
+                    ),
+                  ),
+                  Opacity(
+                    opacity: 1 - back,
+                    child: Transform.translate(
+                      offset: offset + const Offset(14, 34),
+                      child: const Icon(Icons.touch_app_rounded, color: Colors.white, size: 34),
+                    ),
+                  ),
+                ]),
+              ),
+              const SizedBox(height: 10),
+              const Text('How to play', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: C.text)),
+              const SizedBox(height: 18),
+              for (final (k, m) in moves.indexed)
+                _row(m.$1, m.$2, m.$3, m.$4, k == i),
+              const SizedBox(height: 14),
+              const Text('Pull down anytime for the menu.', style: TextStyle(fontSize: 12.5, color: C.dim)),
+            ]);
+          },
+        ),
       ),
     );
   }
+
+  Widget _row(String gesture, String result, IconData icon, Color color, bool active) => AnimatedContainer(
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOut,
+        width: 240,
+        margin: const EdgeInsets.symmetric(vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: active ? color.withValues(alpha: 0.14) : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: active ? color.withValues(alpha: 0.6) : C.line),
+        ),
+        child: Row(children: [
+          Icon(icon, size: 18, color: color),
+          const SizedBox(width: 12),
+          Text(gesture, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: C.text)),
+          const Spacer(),
+          Text(result, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: color)),
+        ]),
+      );
 }

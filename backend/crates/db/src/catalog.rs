@@ -63,7 +63,9 @@ pub async fn sync_roster(pool: &PgPool, league: League, team_id: i64, players: &
         .await?;
         seen.push(p.espn_id.clone());
     }
-    sqlx::query("UPDATE players SET active = false WHERE team_id = $1 AND league = $2 AND NOT (espn_id = ANY($3))")
+    sqlx::query(
+        "UPDATE players SET active = false WHERE team_id = $1 AND league = $2 AND NOT (espn_id = ANY($3)) AND position IS DISTINCT FROM 'TEAM'",
+    )
         .bind(team_id)
         .bind(league.as_str())
         .bind(&seen)
@@ -193,8 +195,29 @@ pub async fn record_box_score(pool: &PgPool, game_id: i64, league: League, box_s
             .bind(game_id)
             .fetch_all(pool)
             .await?;
+    let score: Option<(Option<i32>, Option<i32>, String)> =
+        sqlx::query_as("SELECT home_score, away_score, status FROM games WHERE id = $1")
+            .bind(game_id)
+            .fetch_optional(pool)
+            .await?;
     let mut changed = Vec::new();
     for (mid, pid, key) in markets {
+        if ss_core::lines::is_game_stat(&key) {
+            let Some((Some(h), Some(a), status)) = &score else { continue };
+            if status != "final" {
+                continue;
+            }
+            let (value, source) = match key.as_str() {
+                "total" => ((h + a) * 10, "espn"),
+                // A moneyline tie has no winner: void it like a scratch.
+                "moneyline" if h == a => (0, "dnp"),
+                _ => ((h - a) * 10, "espn"),
+            };
+            if insert_result_if_changed(pool, mid, value, source).await? {
+                changed.push(mid);
+            }
+            continue;
+        }
         // A player who appears anywhere in the box score played; a missing
         // category means zero. A player absent entirely did not play.
         let (value, source) = match values.get(&(pid, key.clone())) {

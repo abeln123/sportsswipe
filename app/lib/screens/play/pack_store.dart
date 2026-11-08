@@ -1,0 +1,484 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:uuid/uuid.dart';
+
+import '../../card/card_spec.dart';
+import '../../core/api.dart';
+import '../../core/format.dart' as f;
+import '../../core/theme.dart';
+import '../../state/pick_queue.dart';
+import '../../state/play.dart';
+import '../../state/session.dart';
+import '../../ui/shell.dart' show CoinGlyph;
+import '../../ui/widgets.dart';
+import 'pack_art.dart';
+import 'pack_deck.dart';
+
+const _uuid = Uuid();
+
+/// A pack in the store, as sent by `GET /packs`.
+class PackOffer {
+  PackOffer(Map<String, dynamic> j)
+      : key = j['key'] as String,
+        name = j['name'] as String,
+        tagline = j['tagline'] as String? ?? '',
+        price = (j['price'] as num).toInt(),
+        size = (j['size'] as num).toInt(),
+        kind = j['kind'] as String? ?? 'mixed',
+        targetPct = (j['targetPct'] as num?)?.toInt(),
+        payout = (j['payout'] as num?)?.toInt() ?? 0,
+        multiplier = (j['multiplier'] as num?)?.toInt() ?? 1,
+        colors = foilColors(j['foil'] as List?),
+        available = (j['available'] as num?)?.toInt() ?? 0;
+
+  final String key, name, tagline, kind;
+  final int price, size, payout, multiplier, available;
+  final int? targetPct;
+  final List<Color> colors;
+
+  bool get challenge => targetPct != null;
+  bool get soldOut => available < (size < 3 ? size : 3);
+  int get deals => available < size ? available : size;
+
+  FoilPack art({double width = 150, double sheen = 0}) => FoilPack(
+        name: name,
+        colors: colors,
+        badge: challenge && !name.toUpperCase().contains('${multiplier}X') ? '${multiplier}X' : null,
+        caption: '$size cards',
+        width: width,
+        sheen: sheen,
+      );
+}
+
+/// Cards being played: a freshly opened pack, or the leftovers.
+class _Session {
+  _Session({required this.id, required this.title, required this.cards, this.pack, this.targetPct, this.payout});
+  final String id;
+  final String title;
+  final List<PlayableCard> cards;
+  final FoilPack? pack;
+  final int? targetPct;
+  final int? payout;
+}
+
+class PackStore extends ConsumerStatefulWidget {
+  const PackStore({super.key, required this.sport});
+  final String sport;
+
+  @override
+  ConsumerState<PackStore> createState() => _PackStoreState();
+}
+
+class _PackStoreState extends ConsumerState<PackStore> with SingleTickerProviderStateMixin {
+  Map<String, dynamic>? _data;
+  Object? _error;
+  _Session? _session;
+  bool _opening = false;
+  late final AnimationController _sheen = AnimationController(vsync: this, duration: const Duration(seconds: 4))..repeat();
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void didUpdateWidget(PackStore old) {
+    super.didUpdateWidget(old);
+    if (old.sport != widget.sport) _load();
+  }
+
+  @override
+  void dispose() {
+    _sheen.dispose();
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    try {
+      final r = await api.get('/packs?sport=${widget.sport}');
+      if (mounted) {
+        setState(() {
+          _data = r;
+          _error = null;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _error = e);
+    }
+  }
+
+  List<PackOffer> get _offers =>
+      ((_data?['packs'] as List?) ?? []).map((e) => PackOffer((e as Map).cast<String, dynamic>())).toList();
+
+  void _exit() {
+    ref.read(playMenuProvider.notifier).close();
+    setState(() => _session = null);
+    _load();
+  }
+
+  Future<void> _buy(PackOffer p) async {
+    final ok = await showSheet<bool>(context, (ctx) => _BuySheet(offer: p, balance: ref.read(displayBalanceProvider)));
+    if (ok != true || !mounted) return;
+    final r = await api.raw('POST', '/packs/buy', body: {'commandId': _uuid.v4(), 'packKey': p.key, 'sport': widget.sport});
+    if (!mounted) return;
+    final body = r.map;
+    if (!r.ok) {
+      toast(context, body['message']?.toString() ?? 'Could not open that pack.', ok: false);
+      _load();
+      return;
+    }
+    final balance = (body['balance'] as num?)?.toInt();
+    if (balance != null) ref.read(summaryProvider.notifier).applyBalance(balance);
+    final cards = ((body['cards'] as List?) ?? []).map((e) => PlayableCard.fromJson((e as Map).cast<String, dynamic>())).toList();
+    setState(() {
+      _session = _Session(
+        id: body['packId'] as String,
+        title: p.name,
+        cards: cards,
+        pack: p.art(width: 220),
+        targetPct: p.targetPct,
+        payout: p.challenge ? p.payout : null,
+      );
+      _opening = true;
+    });
+  }
+
+  Future<void> _leftovers() async {
+    try {
+      final r = await api.get('/packs/leftovers?sport=${widget.sport}');
+      final cards = ((r['cards'] as List?) ?? []).map((e) => PlayableCard.fromJson((e as Map).cast<String, dynamic>())).toList();
+      if (!mounted) return;
+      if (cards.isEmpty) {
+        toast(context, 'No leftover cards right now.');
+        _exit();
+        return;
+      }
+      setState(() {
+        _session = _Session(id: 'leftovers-${DateTime.now().millisecondsSinceEpoch}', title: 'Leftovers', cards: cards);
+        _opening = false;
+      });
+    } catch (e) {
+      if (mounted) toast(context, e.toString(), ok: false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final s = _session;
+    final Widget view;
+    if (s != null && _opening && s.pack != null) {
+      view = PackOpening(
+        key: ValueKey('open-${s.id}'),
+        pack: s.pack!,
+        count: s.cards.length,
+        onDone: () => setState(() => _opening = false),
+      );
+    } else if (s != null) {
+      view = PackDeck(
+        key: ValueKey(s.id),
+        title: s.title,
+        cards: s.cards,
+        sport: widget.sport,
+        targetPct: s.targetPct,
+        payout: s.payout,
+        onExit: _exit,
+        onLeftovers: _leftovers,
+      );
+    } else if (_error != null && _data == null) {
+      view = ErrorText(_error!, onRetry: _load);
+    } else if (_data == null) {
+      view = const Center(child: CircularProgressIndicator(strokeWidth: 2, color: C.dim));
+    } else {
+      view = _store();
+    }
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 300),
+      switchInCurve: Curves.easeOutCubic,
+      switchOutCurve: Curves.easeIn,
+      child: KeyedSubtree(key: ValueKey(view.key ?? view.runtimeType), child: view),
+    );
+  }
+
+  Widget _store() {
+    final offers = _offers;
+    final featured = offers.where((p) => p.challenge).toList();
+    final regular = offers.where((p) => !p.challenge).toList();
+    final leftovers = (_data?['leftoverCount'] as num?)?.toInt() ?? 0;
+    final challenges = ((_data?['challenges'] as List?) ?? []).cast<Map>();
+    return RefreshIndicator(
+      onRefresh: _load,
+      color: C.green,
+      child: ListView(padding: const EdgeInsets.fromLTRB(16, 6, 16, 28), children: [
+        const Text('Packs', style: T.h1),
+        const SizedBox(height: 4),
+        const Text('Open a pack and swipe every card. Results settle after each game.', style: T.dim),
+        if (leftovers > 0) ...[
+          const SizedBox(height: 16),
+          _LeftoverStrip(count: leftovers, onPlay: _leftovers),
+        ],
+        for (final c in challenges) ...[
+          const SizedBox(height: 12),
+          _ChallengeRow(c.cast<String, dynamic>()),
+        ],
+        for (final p in featured) ...[
+          const SizedBox(height: 18),
+          _FeaturedPack(offer: p, sheen: _sheen, onTap: p.soldOut ? null : () => _buy(p)),
+        ],
+        const SizedBox(height: 22),
+        const Text('10-COIN PACKS', style: T.label),
+        const SizedBox(height: 10),
+        GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: regular.length,
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            mainAxisSpacing: 18,
+            crossAxisSpacing: 14,
+            childAspectRatio: 0.56,
+          ),
+          itemBuilder: (context, i) => _PackTile(offer: regular[i], sheen: _sheen, onTap: regular[i].soldOut ? null : () => _buy(regular[i])),
+        ),
+      ]),
+    );
+  }
+}
+
+class _PackTile extends StatelessWidget {
+  const _PackTile({required this.offer, required this.sheen, required this.onTap});
+  final PackOffer offer;
+  final Animation<double> sheen;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+        button: true,
+        enabled: onTap != null,
+        label: '${offer.name}, ${offer.tagline}, ${offer.price} coins${onTap == null ? ', sold out' : ''}',
+        excludeSemantics: true,
+        child: GestureDetector(
+          onTap: onTap,
+          child: Opacity(
+            opacity: onTap == null ? 0.45 : 1,
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Expanded(
+                child: LayoutBuilder(
+                  builder: (context, box) => Center(
+                    child: AnimatedBuilder(
+                      animation: sheen,
+                      builder: (context, _) => offer.art(
+                        width: (box.maxHeight / 1.42).clamp(0.0, box.maxWidth),
+                        sheen: onTap == null ? 0 : sheen.value,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(offer.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: T.h3),
+              Text(offer.tagline, maxLines: 2, overflow: TextOverflow.ellipsis, style: T.small),
+              const SizedBox(height: 6),
+              _Price(price: offer.price, soldOut: onTap == null),
+            ]),
+          ),
+        ),
+      );
+}
+
+class _Price extends StatelessWidget {
+  const _Price({required this.price, this.soldOut = false});
+  final int price;
+  final bool soldOut;
+
+  @override
+  Widget build(BuildContext context) => soldOut
+      ? const Text('Sold out today', style: TextStyle(fontSize: 13, color: C.dim, fontWeight: FontWeight.w600))
+      : Row(children: [
+          const CoinGlyph(size: 14, color: C.text),
+          const SizedBox(width: 5),
+          Text(f.coins(price),
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, fontFeatures: [FontFeature.tabularFigures()])),
+        ]);
+}
+
+class _FeaturedPack extends StatelessWidget {
+  const _FeaturedPack({required this.offer, required this.sheen, required this.onTap});
+  final PackOffer offer;
+  final Animation<double> sheen;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+        button: true,
+        enabled: onTap != null,
+        label: '${offer.name}. Hit ${offer.targetPct} percent to earn ${offer.payout} coins. Costs ${offer.price} coins.',
+        excludeSemantics: true,
+        child: GestureDetector(
+          onTap: onTap,
+          child: Opacity(
+            opacity: onTap == null ? 0.45 : 1,
+            child: Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: C.surface,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: offer.colors.last.withValues(alpha: 0.6)),
+              ),
+              child: Row(children: [
+                AnimatedBuilder(animation: sheen, builder: (context, _) => offer.art(width: 108, sheen: sheen.value)),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    const Text('CHALLENGE', style: T.label),
+                    const SizedBox(height: 4),
+                    Text(offer.name, style: T.h2),
+                    const SizedBox(height: 6),
+                    Text(offer.tagline, style: T.dim),
+                    const SizedBox(height: 10),
+                    Text.rich(TextSpan(style: const TextStyle(fontSize: 13.5, color: C.text), children: [
+                      TextSpan(text: 'Hit ${offer.targetPct}%', style: const TextStyle(fontWeight: FontWeight.w700)),
+                      TextSpan(text: ' of ${offer.size} picks → '),
+                      TextSpan(text: '${f.coins(offer.payout)} coins', style: const TextStyle(fontWeight: FontWeight.w700)),
+                    ])),
+                    const SizedBox(height: 10),
+                    _Price(price: offer.price, soldOut: onTap == null),
+                  ]),
+                ),
+              ]),
+            ),
+          ),
+        ),
+      );
+}
+
+class _LeftoverStrip extends StatelessWidget {
+  const _LeftoverStrip({required this.count, required this.onPlay});
+  final int count;
+  final VoidCallback onPlay;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+        button: true,
+        label: 'Leftover cards, $count not played yet',
+        excludeSemantics: true,
+        child: GestureDetector(
+          onTap: onPlay,
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
+            decoration: BoxDecoration(color: C.surface, borderRadius: BorderRadius.circular(12), border: Border.all(color: C.line)),
+            child: Row(children: [
+              SizedBox(
+                width: 46,
+                height: 44,
+                child: Stack(children: [
+                  for (var i = 0; i < 3; i++)
+                    Positioned(
+                      left: i * 7.0,
+                      top: (2 - i) * 2.0,
+                      child: Transform.rotate(angle: (i - 1) * 0.12, child: const CardBack(width: 28)),
+                    ),
+                ]),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  const Text('Leftover cards', style: T.h3),
+                  Text('$count from your packs, still open', style: T.small),
+                ]),
+              ),
+              const Text('Swipe', style: TextStyle(fontWeight: FontWeight.w700)),
+              const Icon(Icons.chevron_right_rounded, color: C.dim),
+            ]),
+          ),
+        ),
+      );
+}
+
+class _ChallengeRow extends StatelessWidget {
+  const _ChallengeRow(this.c);
+  final Map<String, dynamic> c;
+
+  @override
+  Widget build(BuildContext context) {
+    final size = (c['size'] as num).toInt();
+    final won = (c['won'] as num?)?.toInt() ?? 0;
+    final picked = (c['picked'] as num?)?.toInt() ?? 0;
+    final target = (c['targetPct'] as num?)?.toInt() ?? 80;
+    final need = (size * target / 100).ceil();
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(borderRadius: BorderRadius.circular(12), border: Border.all(color: C.line)),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Expanded(child: Text('${c['name']} in play', style: T.h3)),
+          Text('${f.coins((c['payout'] as num?)?.toInt() ?? 0)} coins', style: const TextStyle(fontWeight: FontWeight.w700)),
+        ]),
+        const SizedBox(height: 8),
+        Row(children: [
+          for (var i = 0; i < size; i++)
+            Expanded(
+              child: Container(
+                height: 6,
+                margin: const EdgeInsets.only(right: 4),
+                decoration: BoxDecoration(
+                  color: i < won ? C.text : (i < picked ? C.faint : C.line),
+                  borderRadius: BorderRadius.circular(3),
+                ),
+              ),
+            ),
+        ]),
+        const SizedBox(height: 8),
+        Text('$won hit · $picked of $size picked · needs $need', style: T.small),
+      ]),
+    );
+  }
+}
+
+class _BuySheet extends StatelessWidget {
+  const _BuySheet({required this.offer, required this.balance});
+  final PackOffer offer;
+  final int balance;
+
+  @override
+  Widget build(BuildContext context) {
+    final short = balance < offer.price;
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Center(child: offer.art(width: 150, sheen: 0.4)),
+      const SizedBox(height: 18),
+      Text(offer.name, style: T.h1, textAlign: TextAlign.center),
+      const SizedBox(height: 6),
+      Text(offer.tagline, style: T.dim, textAlign: TextAlign.center),
+      const SizedBox(height: 18),
+      _line('Cards', '${offer.deals}'),
+      if (offer.challenge) ...[
+        _line('Goal', 'Hit ${offer.targetPct}% of picks'),
+        _line('Pays if you make it', '${f.coins(offer.payout)} coins'),
+      ] else
+        _line('Each right pick', 'Earns coins and mastery'),
+      _line('Balance after', '${f.coins(balance - offer.price)} coins'),
+      const SizedBox(height: 18),
+      PrimaryButton(
+        short ? 'Not enough coins' : 'Open for ${f.coins(offer.price)} coins',
+        onPressed: short
+            ? null
+            : () {
+                HapticFeedback.mediumImpact();
+                Navigator.pop(context, true);
+              },
+      ),
+      const SizedBox(height: 6),
+      Center(child: GhostButton('Not now', color: C.dim, onPressed: () => Navigator.pop(context, false))),
+    ]);
+  }
+
+  Widget _line(String a, String b) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 5),
+        child: Row(children: [
+          Text(a, style: T.dim),
+          const Spacer(),
+          Text(b, style: const TextStyle(fontWeight: FontWeight.w700)),
+        ]),
+      );
+}

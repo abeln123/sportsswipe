@@ -224,21 +224,52 @@ pub async fn playable_cards(pool: &PgPool, user_id: Option<Uuid>, market_ids: &[
     let mastery = mastery_for(pool, user_id, &player_ids).await?;
     let mut by_id: HashMap<i64, Value> = HashMap::new();
     for r in &rows {
-        let form = recent_form(pool, r.player_id, &r.stat_key, ss_core::lines::FORM_GAMES as i64).await?;
+        let form: Vec<f64> = if ss_core::lines::is_game_stat(&r.stat_key) {
+            team_form(pool, r.player_id, &r.stat_key).await?
+        } else {
+            recent_form(pool, r.player_id, &r.stat_key, ss_core::lines::FORM_GAMES as i64)
+                .await?
+                .iter()
+                .map(|f| crate::x10_to_f64(f.value_x10))
+                .collect()
+        };
         by_id.insert(r.market_id, json!({
             "card": specs.get(&r.player_id),
             "market": market_json(r),
-            "recentForm": form.iter().map(|f| crate::x10_to_f64(f.value_x10)).collect::<Vec<_>>(),
+            "recentForm": form,
             "mastery": mastery.get(&r.player_id),
         }));
     }
     Ok(market_ids.iter().filter_map(|id| by_id.remove(id)).collect())
 }
 
+/// A team's last finals, oldest first: its margin, or combined points for totals.
+async fn team_form(pool: &PgPool, team_player_id: i64, stat_key: &str) -> Result<Vec<f64>> {
+    let mut rows: Vec<(i32, i32)> = sqlx::query_as(
+        r#"SELECT CASE WHEN g.home_team_id = p.team_id THEN g.home_score - g.away_score ELSE g.away_score - g.home_score END,
+                  g.home_score + g.away_score
+           FROM players p JOIN games g ON g.home_team_id = p.team_id OR g.away_team_id = p.team_id
+           WHERE p.id = $1 AND g.status = 'final' AND g.home_score IS NOT NULL AND g.away_score IS NOT NULL
+           ORDER BY g.start_at DESC LIMIT $2"#,
+    )
+    .bind(team_player_id)
+    .bind(ss_core::lines::FORM_GAMES as i64)
+    .fetch_all(pool)
+    .await?;
+    rows.reverse();
+    Ok(rows.into_iter().map(|(m, t)| if stat_key == "total" { t as f64 } else { m as f64 }).collect())
+}
+
 pub fn market_json(r: &MarketRow) -> Value {
     let total = r.over_count + r.under_count;
     let (team, opp) = if r.is_home { (&r.home_abbr, &r.away_abbr) } else { (&r.away_abbr, &r.home_abbr) };
+    let labels = ss_core::lines::side_labels(&r.stat_key, r.line_x10, &r.home_abbr, &r.away_abbr);
     json!({
+        "kind": if labels.is_some() { "game" } else { "player" },
+        "overLabel": labels.as_ref().map(|l| &l.0),
+        "underLabel": labels.as_ref().map(|l| &l.1),
+        "homeAbbr": r.home_abbr,
+        "awayAbbr": r.away_abbr,
         "marketId": r.market_id,
         "lineVersion": r.line_version,
         "line": crate::x10_to_f64(r.line_x10),

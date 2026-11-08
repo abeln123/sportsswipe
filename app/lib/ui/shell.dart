@@ -9,8 +9,9 @@ import '../core/api.dart';
 import '../core/format.dart' as f;
 import '../core/theme.dart';
 import '../screens/picks_screen.dart';
-import '../state/immersive.dart';
 import '../state/pick_queue.dart';
+import '../state/play.dart';
+import '../state/receipt.dart';
 import '../state/session.dart';
 import 'widgets.dart';
 
@@ -81,70 +82,267 @@ class _StatusBar extends StatelessWidget {
       );
 }
 
+/// Top bar. On Play it is also the way in: where you are on the left, the
+/// menu on the right; elsewhere it only shows coins.
 class AppHeader extends ConsumerWidget {
-  const AppHeader({super.key});
+  const AppHeader({super.key, this.play = false});
+  final bool play;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final balance = ref.watch(displayBalanceProvider);
     final loaded = ref.watch(summaryProvider).loaded;
-    final immersive = ref.watch(immersiveProvider);
+    final mode = ref.watch(playModeProvider);
+    final open = ref.watch(playMenuProvider);
+    void toggle() => ref.read(playMenuProvider.notifier).toggle();
     return SizedBox(
-      height: 44,
-      child: Row(children: [
-        AnimatedOpacity(
-          opacity: immersive ? 1 : 0,
-          duration: const Duration(milliseconds: 200),
-          child: IgnorePointer(
-            ignoring: !immersive,
-            child: Semantics(
+      height: 48,
+      child: Padding(
+        padding: EdgeInsets.only(left: play ? 8 : 16, right: play ? 4 : 16),
+        child: Row(children: [
+          if (play)
+            Semantics(
               button: true,
-              label: 'Show menu',
+              expanded: open,
+              label: '${mode.place}, change mode and sport',
               excludeSemantics: true,
               child: GestureDetector(
                 behavior: HitTestBehavior.opaque,
-                onTap: () => ref.read(immersiveProvider.notifier).set(false),
-                child: const Padding(
-                  padding: EdgeInsets.fromLTRB(16, 8, 16, 8),
-                  child: Row(children: [
-                    Icon(Icons.keyboard_arrow_down_rounded, color: C.dim, size: 22),
-                    SizedBox(width: 2),
-                    Text('Menu', style: TextStyle(color: C.dim, fontSize: 13, fontWeight: FontWeight.w600)),
-                  ]),
+                onTap: toggle,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 180),
+                        child: Text(mode.place,
+                            key: ValueKey(mode.place),
+                            style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800, color: C.text, letterSpacing: -0.2)),
+                      ),
+                      const SizedBox(width: 4),
+                      AnimatedRotation(
+                        turns: open ? 0.5 : 0,
+                        duration: const Duration(milliseconds: 200),
+                        child: const Icon(Icons.keyboard_arrow_down_rounded, size: 22, color: C.dim),
+                      ),
+                    ]),
+                  ),
                 ),
               ),
             ),
-          ),
-        ),
-        const Spacer(),
-        Semantics(
-          label: 'Coin balance ${f.coins(balance)}',
-          excludeSemantics: true,
-          child: Container(
-            margin: const EdgeInsets.only(right: 16),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(color: C.surface, borderRadius: BorderRadius.circular(20), border: Border.all(color: C.line)),
+          const Spacer(),
+          Semantics(
+            label: 'Coin balance ${f.coins(balance)}',
+            excludeSemantics: true,
             child: Row(mainAxisSize: MainAxisSize.min, children: [
-              const Icon(Icons.toll_rounded, size: 16, color: C.green),
+              const CoinGlyph(),
               const SizedBox(width: 6),
               AnimatedSwitcher(
-                duration: const Duration(milliseconds: 220),
-                transitionBuilder: (child, a) => FadeTransition(
-                  opacity: a,
-                  child: SlideTransition(position: Tween(begin: const Offset(0, 0.4), end: Offset.zero).animate(a), child: child),
-                ),
+                duration: const Duration(milliseconds: 200),
                 child: Text(
                   loaded ? f.coins(balance) : '—',
                   key: ValueKey(loaded ? balance : -1),
-                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: C.text),
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: C.text,
+                    fontFeatures: [FontFeature.tabularFigures()],
+                  ),
                 ),
               ),
             ]),
           ),
-        ),
-      ]),
+          if (play)
+            Semantics(
+              button: true,
+              expanded: open,
+              label: open ? 'Close menu' : 'Menu',
+              excludeSemantics: true,
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: toggle,
+                child: SizedBox(width: 48, height: 44, child: Center(child: _MenuGlyph(open: open))),
+              ),
+            ),
+        ]),
+      ),
     );
   }
+}
+
+/// A plain coin mark: a ring with a small inner ring.
+class CoinGlyph extends StatelessWidget {
+  const CoinGlyph({super.key, this.size = 16, this.color = C.dim});
+  final double size;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: color, width: 1.6)),
+        child: Center(
+          child: Container(
+            width: size * 0.42,
+            height: size * 0.42,
+            decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: color, width: 1.2)),
+          ),
+        ),
+      );
+}
+
+/// Three lines that fold into an X while the menu is open.
+class _MenuGlyph extends StatelessWidget {
+  const _MenuGlyph({required this.open});
+  final bool open;
+
+  @override
+  Widget build(BuildContext context) => TweenAnimationBuilder<double>(
+        tween: Tween(end: open ? 1 : 0),
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOutCubic,
+        builder: (context, t, _) => CustomPaint(size: const Size(22, 16), painter: _MenuPainter(t)),
+      );
+}
+
+class _MenuPainter extends CustomPainter {
+  _MenuPainter(this.t);
+  final double t;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final p = Paint()
+      ..color = C.text
+      ..strokeWidth = 2
+      ..strokeCap = StrokeCap.round;
+    final w = size.width, h = size.height, c = h / 2;
+    canvas.save();
+    canvas.translate(w / 2, c);
+    // Top and bottom lines rotate into an X; the middle one fades.
+    for (final (dy, sign) in [(-c + 1, 1.0), (c - 1, -1.0)]) {
+      canvas.save();
+      canvas.translate(0, dy * (1 - t));
+      canvas.rotate(sign * t * 0.785);
+      canvas.drawLine(Offset(-w / 2 + 1, 0), Offset(w / 2 - 1, 0), p);
+      canvas.restore();
+    }
+    p.color = C.text.withValues(alpha: 1 - t);
+    canvas.drawLine(Offset(-w / 2 + 1 + t * 6, 0), Offset(w / 2 - 1 - t * 6, 0), p);
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(_MenuPainter old) => old.t != t;
+}
+
+/// Two offset trading cards; the front one fills in when Play is selected.
+class PlayGlyph extends StatelessWidget {
+  const PlayGlyph({super.key, required this.selected, required this.color});
+  final bool selected;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => CustomPaint(size: const Size(24, 24), painter: _PlayPainter(selected, color));
+}
+
+class _PlayPainter extends CustomPainter {
+  _PlayPainter(this.selected, this.color);
+  final bool selected;
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final stroke = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.7
+      ..strokeJoin = StrokeJoin.round;
+    void card(Offset c, double angle, {bool fill = false}) {
+      canvas.save();
+      canvas.translate(c.dx, c.dy);
+      canvas.rotate(angle);
+      final r = RRect.fromRectAndRadius(Rect.fromCenter(center: Offset.zero, width: 12.5, height: 17), const Radius.circular(2.2));
+      if (fill) {
+        canvas.drawRRect(r, Paint()..color = color);
+      } else {
+        // Clear what is behind so the front card reads as on top.
+        canvas.drawRRect(r, Paint()..color = C.bg);
+        canvas.drawRRect(r, stroke);
+      }
+      canvas.restore();
+    }
+
+    card(const Offset(9.5, 11), -0.2);
+    card(const Offset(14.5, 13), 0.12, fill: selected);
+  }
+
+  @override
+  bool shouldRepaint(_PlayPainter old) => old.selected != selected || old.color != color;
+}
+
+/// The latest pick, quietly, above the tabs: what it was, then whether it can
+/// still be undone, is going out, or went through.
+class ReceiptBar extends ConsumerWidget {
+  const ReceiptBar({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final r = ref.watch(receiptProvider);
+    final still = MediaQuery.of(context).disableAnimations;
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 200),
+      transitionBuilder: (child, a) => still
+          ? FadeTransition(opacity: a, child: child)
+          : FadeTransition(
+              opacity: a,
+              child: SizeTransition(sizeFactor: a, alignment: Alignment.bottomCenter, child: child),
+            ),
+      child: r == null
+          ? const SizedBox(key: ValueKey('none'), width: double.infinity)
+          : Container(
+              key: ValueKey(r.commandId),
+              height: 40,
+              padding: const EdgeInsets.only(left: 16, right: 6),
+              decoration: const BoxDecoration(color: C.bg, border: Border(top: BorderSide(color: C.line))),
+              child: Row(children: [
+                Expanded(
+                  child: Text(r.text,
+                      maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13.5, color: C.text)),
+                ),
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 180),
+                  child: KeyedSubtree(key: ValueKey(r.status), child: _trailing(r, ref)),
+                ),
+              ]),
+            ),
+    );
+  }
+
+  Widget _trailing(Receipt r, WidgetRef ref) => switch (r.status) {
+        'holding' => TextButton(
+            onPressed: () => ref.read(receiptProvider.notifier).undo(),
+            style: TextButton.styleFrom(minimumSize: const Size(56, 40), foregroundColor: C.text),
+            child: const Text('Undo', style: TextStyle(fontWeight: FontWeight.w700, decoration: TextDecoration.underline)),
+          ),
+        'slow' => const Padding(
+            padding: EdgeInsets.only(right: 10),
+            child: Text('Submitting…', style: TextStyle(fontSize: 13, color: C.dim)),
+          ),
+        'submitted' => const Padding(
+            padding: EdgeInsets.only(right: 10),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              Icon(Icons.check_rounded, size: 16, color: C.green),
+              SizedBox(width: 4),
+              Text('Pick submitted', style: TextStyle(fontSize: 13, color: C.green, fontWeight: FontWeight.w600)),
+            ]),
+          ),
+        'rejected' => Padding(
+            padding: const EdgeInsets.only(right: 10),
+            child: Text(r.error ?? 'Not accepted', style: const TextStyle(fontSize: 13, color: C.danger)),
+          ),
+        _ => const SizedBox(width: 10),
+      };
 }
 
 class AppShell extends ConsumerStatefulWidget {
@@ -173,6 +371,8 @@ class _AppShellState extends ConsumerState<AppShell> with SingleTickerProviderSt
     );
     _events = ref.read(pickQueueProvider.notifier).events.listen((e) {
       if (!mounted || !e.rejected) return;
+      // The receipt bar already reports its own pick.
+      if (ref.read(receiptProvider)?.commandId == e.intent.commandId) return;
       final msg = switch (e.code) {
         'pick_closed' => 'Pick closed · no coins used.',
         'insufficient_coins' => 'Not enough coins · no coins used.',
@@ -189,9 +389,8 @@ class _AppShellState extends ConsumerState<AppShell> with SingleTickerProviderSt
   void _warmTabs() {
     final me = ref.read(sessionProvider).value;
     for (final path in [
-      '/deck?sport=all&limit=12',
-      '/deck?sport=nba&limit=12',
-      '/deck?sport=nfl&limit=12',
+      '/packs?sport=all',
+      '/deck?sport=all&limit=20',
       '/contests/current',
       '/me/picks?status=pending',
       '/friends',
@@ -207,7 +406,7 @@ class _AppShellState extends ConsumerState<AppShell> with SingleTickerProviderSt
   }
 
   void _goBranch(int i) {
-    ref.read(immersiveProvider.notifier).set(false);
+    ref.read(playMenuProvider.notifier).close();
     if (i != widget.shell.currentIndex) _tabFade.forward(from: 0);
     widget.shell.goBranch(i, initialLocation: i == widget.shell.currentIndex);
   }
@@ -237,21 +436,21 @@ class _AppShellState extends ConsumerState<AppShell> with SingleTickerProviderSt
       if (next.unrevealed > (prev?.unrevealed ?? 0)) _maybeShowResults(next);
     });
     final summary = ref.watch(summaryProvider);
-    final queued = ref.watch(pickQueueProvider).length;
-    final badge = summary.pending + queued;
+    // Only results that have settled and not been seen yet.
+    final badge = summary.unrevealed;
+    final current = widget.shell.currentIndex;
     const items = [
-      (Icons.crop_portrait_rounded, 'Play'),
+      (Icons.style_outlined, 'Play'),
       (Icons.receipt_long_outlined, 'My picks'),
       (Icons.people_outline, 'Social'),
       (Icons.chat_outlined, 'AI'),
       (Icons.person_outline, 'Profile'),
     ];
-    final immersive = ref.watch(immersiveProvider) && widget.shell.currentIndex == 0;
     return Scaffold(
       body: SafeArea(
         bottom: false,
         child: Column(children: [
-          const AppHeader(),
+          AppHeader(play: current == 0),
           Expanded(
             child: FadeTransition(
               opacity: CurvedAnimation(parent: _tabFade, curve: Curves.easeOut),
@@ -264,10 +463,9 @@ class _AppShellState extends ConsumerState<AppShell> with SingleTickerProviderSt
           ),
         ]),
       ),
-      bottomNavigationBar: Collapse(
-        visible: !immersive,
-        alignment: Alignment.bottomCenter,
-        child: Container(
+      bottomNavigationBar: Column(mainAxisSize: MainAxisSize.min, children: [
+        const ReceiptBar(),
+        Container(
         decoration: const BoxDecoration(color: C.bg, border: Border(top: BorderSide(color: C.line))),
         child: SafeArea(
           top: false,
@@ -280,12 +478,15 @@ class _AppShellState extends ConsumerState<AppShell> with SingleTickerProviderSt
                     onTap: () => _goBranch(i),
                     child: Semantics(
                       selected: i == widget.shell.currentIndex,
-                      label: i == 1 && badge > 0 ? '${items[i].$2}, $badge pending' : items[i].$2,
+                      label: i == 1 && badge > 0 ? '${items[i].$2}, $badge new ${badge == 1 ? 'result' : 'results'}' : items[i].$2,
                       button: true,
                       excludeSemantics: true,
                       child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
                         Stack(clipBehavior: Clip.none, children: [
-                          Icon(items[i].$1, color: i == widget.shell.currentIndex ? C.green : C.dim, size: 24),
+                          if (i == 0)
+                            PlayGlyph(selected: current == 0, color: current == 0 ? C.green : C.dim)
+                          else
+                            Icon(items[i].$1, color: i == current ? C.green : C.dim, size: 24),
                           if (i == 1 && badge > 0)
                             Positioned(
                               right: -16,
@@ -312,7 +513,7 @@ class _AppShellState extends ConsumerState<AppShell> with SingleTickerProviderSt
           ),
         ),
       ),
-      ),
+      ]),
     );
   }
 }

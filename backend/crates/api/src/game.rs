@@ -91,11 +91,20 @@ struct PickBody {
     #[serde(flatten)]
     leg: LegBody,
     stake: i64,
+    pack_id: Option<Uuid>,
 }
 
 async fn post_pick(State(state): State<AppState>, user: AuthUser, Json(b): Json<PickBody>) -> ApiResult<Response> {
-    let o = ss_db::picks::accept_entry(&state.pool, user.id, b.command_id, EntryKind::Single, b.stake, vec![b.leg.to_req()?])
-        .await?;
+    let o = ss_db::picks::accept_entry(
+        &state.pool,
+        user.id,
+        b.command_id,
+        EntryKind::Single,
+        b.stake,
+        vec![b.leg.to_req()?],
+        b.pack_id,
+    )
+    .await?;
     Ok(outcome(o))
 }
 
@@ -109,7 +118,7 @@ struct ParlayBody {
 
 async fn post_parlay(State(state): State<AppState>, user: AuthUser, Json(b): Json<ParlayBody>) -> ApiResult<Response> {
     let legs = b.legs.iter().map(LegBody::to_req).collect::<ApiResult<Vec<_>>>()?;
-    let o = ss_db::picks::accept_entry(&state.pool, user.id, b.command_id, EntryKind::Parlay, b.stake, legs).await?;
+    let o = ss_db::picks::accept_entry(&state.pool, user.id, b.command_id, EntryKind::Parlay, b.stake, legs, None).await?;
     Ok(outcome(o))
 }
 
@@ -148,8 +157,19 @@ struct LegRow {
     result: Option<String>,
     player_id: i64,
     stat_label: String,
+    stat_key: String,
     game_status: String,
+    home_abbr: String,
+    away_abbr: String,
     result_value_x10: Option<i32>,
+}
+
+impl LegRow {
+    /// "BUF -3.5" for game markets; None for player lines.
+    fn side_label(&self) -> Option<String> {
+        let (over, under) = ss_core::lines::side_labels(&self.stat_key, self.line_x10, &self.home_abbr, &self.away_abbr)?;
+        Some(if self.side == "over" { over } else { under })
+    }
 }
 
 /// Entries with legs, card specs and a stage for the 3-segment status bar
@@ -158,10 +178,12 @@ async fn entries_json(state: &AppState, entries: Vec<EntryRow>) -> ApiResult<Vec
     let ids: Vec<Uuid> = entries.iter().map(|e| e.id).collect();
     let legs: Vec<LegRow> = sqlx::query_as(
         r#"SELECT el.entry_id, el.leg_no, el.market_id, el.line_version, el.line_x10, el.side, el.result,
-                  m.player_id, sd.label AS stat_label, g.status AS game_status,
+                  m.player_id, sd.label AS stat_label, m.stat_key, g.status AS game_status,
+                  ht.abbr AS home_abbr, at.abbr AS away_abbr,
                   (SELECT value_x10 FROM market_results r WHERE r.market_id = m.id ORDER BY revision DESC LIMIT 1) AS result_value_x10
            FROM entry_legs el JOIN markets m ON m.id = el.market_id
            JOIN stat_definitions sd ON sd.key = m.stat_key JOIN games g ON g.id = m.game_id
+           JOIN teams ht ON ht.id = g.home_team_id JOIN teams at ON at.id = g.away_team_id
            WHERE el.entry_id = ANY($1) ORDER BY el.entry_id, el.leg_no"#,
     )
     .bind(&ids)
@@ -181,6 +203,7 @@ async fn entries_json(state: &AppState, entries: Vec<EntryRow>) -> ApiResult<Vec
                         "legNo": l.leg_no, "marketId": l.market_id, "lineVersion": l.line_version,
                         "line": ss_db::x10_to_f64(l.line_x10), "side": l.side, "result": l.result,
                         "statLabel": l.stat_label, "stage": stage, "card": specs.get(&l.player_id),
+                        "sideLabel": l.side_label(),
                         "resultValue": l.result.as_ref().and(l.result_value_x10).map(ss_db::x10_to_f64),
                     })
                 })

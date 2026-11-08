@@ -65,6 +65,7 @@ async fn publish_day(pool: &PgPool, day_id: i64, date: NaiveDate) -> Result<bool
            JOIN players p ON p.id = m.player_id
            JOIN stat_definitions sd ON sd.key = m.stat_key
            WHERE m.status = 'open' AND m.lock_at >= $1 AND m.lock_at < $2 AND m.lock_at > now() + interval '30 minutes'
+             AND p.position IS DISTINCT FROM 'TEAM'
            ORDER BY row_number() OVER (PARTITION BY p.league, m.stat_key ORDER BY lv.line_x10 DESC, m.id), m.id"#,
     )
     .bind(from)

@@ -85,13 +85,14 @@ class SportCard extends StatelessWidget {
                 Container(height: 1.5 * s, color: spec.colorway.base.withValues(alpha: 0.35)),
                 Padding(
                   padding: EdgeInsets.fromLTRB(16 * s, 12 * s, 16 * s, 0),
-                  child: _NameBlock(spec: spec, scale: s, compact: variant == CardVariant.tile),
+                  child: _NameBlock(spec: spec, scale: s, compact: variant == CardVariant.tile, opponent: market?.awayAbbr),
                 ),
                 if (market != null && variant != CardVariant.tile) ...[
                   if (variant == CardVariant.full)
                     Padding(
                       padding: EdgeInsets.fromLTRB(16 * s, 4 * s, 16 * s, 0),
-                      child: Text('${market!.matchup} · ${f.time(market!.startAt)}',
+                      child: Text(
+                          '${market!.isGame ? '${market!.awayAbbr} at ${market!.homeAbbr}' : market!.matchup} · ${f.time(market!.startAt)}',
                           style: TextStyle(fontSize: 12.5 * s, fontWeight: FontWeight.w600, color: C.ink)),
                     ),
                   Padding(padding: EdgeInsets.symmetric(horizontal: 16 * s), child: _divider(s)),
@@ -150,11 +151,11 @@ class _Hero extends StatelessWidget {
           left: 6 * s,
           top: -14 * s,
           child: Text(
-            spec.jerseyNumber,
+            spec.isTeam ? spec.teamAbbr : spec.jerseyNumber,
             style: TextStyle(
               fontFamily: kCondensed,
               fontWeight: FontWeight.w800,
-              fontSize: 168 * s,
+              fontSize: (spec.isTeam ? 128 : 168) * s,
               height: 1,
               color: const Color(0xFFB9C3CC).withValues(alpha: 0.55),
             ),
@@ -215,11 +216,12 @@ class _HeroBackdrop extends CustomPainter {
 }
 
 class _NameBlock extends StatelessWidget {
-  const _NameBlock({required this.spec, required this.scale, required this.compact});
+  const _NameBlock({required this.spec, required this.scale, required this.compact, this.opponent});
 
   final CardSpec spec;
   final double scale;
   final bool compact;
+  final String? opponent;
 
   @override
   Widget build(BuildContext context) {
@@ -267,10 +269,14 @@ class _NameBlock extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text('NO.', style: TextStyle(fontSize: 10 * s, fontWeight: FontWeight.w700, letterSpacing: 1.5, color: C.ink)),
-                Text(spec.jerseyNumber.isEmpty ? '–' : spec.jerseyNumber,
+                Text(spec.isTeam ? 'VS' : 'NO.',
+                    style: TextStyle(fontSize: 10 * s, fontWeight: FontWeight.w700, letterSpacing: 1.5, color: C.ink)),
+                Text(
+                    spec.isTeam
+                        ? (opponent ?? '–')
+                        : (spec.jerseyNumber.isEmpty ? '–' : spec.jerseyNumber),
                     style: TextStyle(fontFamily: kCondensed, fontWeight: FontWeight.w800, fontSize: 30 * s, height: 1, color: C.ink)),
-                Text(spec.series.toUpperCase(),
+                Text(spec.isTeam ? 'GAME CARD' : spec.series.toUpperCase(),
                     style: TextStyle(fontSize: 7.5 * s, fontWeight: FontWeight.w700, letterSpacing: 1.2, color: C.inkDim)),
               ],
             ),
@@ -291,21 +297,34 @@ class _LineRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final s = scale;
+    final m = market;
+    final (big, short) = switch (m.statKey) {
+      'moneyline' => ('WIN', 'MONEYLINE'),
+      'spread' => (m.overLabel.split(' ').last, '${m.homeAbbr} SPREAD'),
+      _ => (f.line(m.line), m.statShort),
+    };
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Text(f.line(market.line),
+        Text(big,
             style: TextStyle(fontFamily: kCondensed, fontWeight: FontWeight.w800, fontSize: 44 * s, height: 1, color: C.ink)),
         Container(width: 1.2, height: 34 * s, margin: EdgeInsets.symmetric(horizontal: 12 * s), color: C.ink),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(market.statShort,
+              Text(short,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(fontFamily: kCondensed, fontWeight: FontWeight.w800, fontSize: 20 * s, height: 1.05, color: C.ink)),
-              Text(contest ? 'Shared contest line' : 'Locks ${f.dayTime(market.lockAt)}',
+              Text(
+                  contest
+                      ? 'Shared contest line'
+                      : m.isGame
+                          ? 'Right ${m.overLabel} · Left ${m.underLabel}'
+                          : 'Locks ${f.dayTime(m.lockAt)}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(fontSize: 11.5 * s, color: C.inkDim)),
             ],
           ),
@@ -401,11 +420,13 @@ class RecentForm extends StatelessWidget {
 
 /// Community split bar (Under purple, Over green).
 class CommunityBar extends StatelessWidget {
-  const CommunityBar({super.key, required this.overPct, required this.total, this.scale = 1});
+  const CommunityBar({super.key, required this.overPct, required this.total, this.scale = 1, this.overLabel = 'Over', this.underLabel = 'Under'});
 
   final int overPct;
   final int total;
   final double scale;
+  final String overLabel;
+  final String underLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -420,9 +441,9 @@ class CommunityBar extends StatelessWidget {
             Text(total == 0 ? 'No picks yet' : '$total picks', style: TextStyle(fontSize: 11 * s, color: C.inkDim)),
           ]),
           Row(children: [
-            Text('Under ${100 - overPct}%', style: TextStyle(fontSize: 12 * s, color: C.ink)),
+            Text('$underLabel ${100 - overPct}%', style: TextStyle(fontSize: 12 * s, color: C.ink)),
             const Spacer(),
-            Text('$overPct% Over', style: TextStyle(fontSize: 12 * s, color: C.ink)),
+            Text('$overPct% $overLabel', style: TextStyle(fontSize: 12 * s, color: C.ink)),
           ]),
           SizedBox(height: 3 * s),
           ClipRRect(

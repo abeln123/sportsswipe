@@ -126,6 +126,7 @@ pub async fn accept_entry(
     kind: EntryKind,
     stake: i64,
     legs: Vec<LegRequest>,
+    pack: Option<Uuid>,
 ) -> Result<Outcome> {
     let hash = payload_hash(kind, stake, &legs);
     let mut tx = pool.begin().await?;
@@ -136,6 +137,20 @@ pub async fn accept_entry(
     }
 
     let outcome = decide(&mut tx, user_id, command_id, kind, stake, &legs).await?;
+    if let (Some(pack), Some(entry_id), EntryKind::Single) = (pack, outcome.body["entryId"].as_str(), kind) {
+        sqlx::query(
+            r#"UPDATE pack_cards pc SET entry_id = $3::uuid, picked_at = now()
+               FROM pack_purchases pp
+               WHERE pp.id = pc.purchase_id AND pp.user_id = $1 AND pc.purchase_id = $2
+                 AND pc.market_id = $4 AND pc.entry_id IS NULL"#,
+        )
+        .bind(user_id)
+        .bind(pack)
+        .bind(entry_id)
+        .bind(legs[0].market_id)
+        .execute(&mut *tx)
+        .await?;
+    }
     record(&mut tx, user_id, command_id, kind.as_str(), &hash, &outcome).await?;
     tx.commit().await?;
     Ok(outcome)

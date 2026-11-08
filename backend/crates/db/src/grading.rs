@@ -219,6 +219,7 @@ async fn settle_entry(tx: &mut Transaction<'_, Postgres>, entry_id: Uuid) -> Res
     .bind(status_changed)
     .execute(&mut **tx)
     .await?;
+    crate::packs::settle_for_entry(tx, entry_id).await?;
 
     // Mastery: one credit per person, athlete and market regardless of entry
     // point. Losing parlays earn none.

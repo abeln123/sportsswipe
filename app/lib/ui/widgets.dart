@@ -203,17 +203,20 @@ class StageBar extends StatelessWidget {
 }
 
 class SideText extends StatelessWidget {
-  const SideText({super.key, required this.side, required this.line, this.rest, this.size = 15});
+  const SideText({super.key, required this.side, required this.line, this.rest, this.size = 15, this.label});
   final String side;
   final double line;
   final String? rest;
   final double size;
 
+  /// Replaces "Over 24.5" for game lines, e.g. "BUF -3.5".
+  final String? label;
+
   @override
   Widget build(BuildContext context) => Text.rich(
         TextSpan(children: [
           TextSpan(
-            text: '${f.cap(side)} ${f.line(line)}',
+            text: label ?? '${f.cap(side)} ${f.line(line)}',
             style: TextStyle(color: side == 'over' ? C.over : C.under, fontWeight: FontWeight.w700, fontSize: size),
           ),
           if (rest != null) TextSpan(text: '  $rest', style: TextStyle(color: C.text, fontSize: size)),
@@ -394,15 +397,8 @@ class Loading extends StatelessWidget {
     if (card) {
       return Shimmer(
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
-          child: Column(children: [
-            Expanded(child: Center(child: AspectRatio(aspectRatio: 0.62, child: Container(decoration: _block(18))))),
-            const SizedBox(height: 18),
-            Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-              for (var i = 0; i < 3; i++)
-                Container(width: 56, height: 56, margin: const EdgeInsets.symmetric(horizontal: 14), decoration: _block(28)),
-            ]),
-          ]),
+          padding: const EdgeInsets.fromLTRB(24, 16, 24, 20),
+          child: Center(child: AspectRatio(aspectRatio: 0.62, child: Container(decoration: _block(18)))),
         ),
       );
     }

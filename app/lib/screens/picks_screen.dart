@@ -190,7 +190,11 @@ class _EntryRow extends StatelessWidget {
           _resultIcon(l['result'] as String? ?? (settled ? status : null)),
         ]),
         const SizedBox(height: 10),
-        SideText(side: l['side'] as String, line: (l['line'] as num).toDouble(), rest: l['statLabel'] as String),
+        SideText(
+            side: l['side'] as String,
+            line: (l['line'] as num).toDouble(),
+            rest: l['statLabel'] as String,
+            label: l['sideLabel'] as String?),
         if (l['resultValue'] != null)
           Padding(
             padding: const EdgeInsets.only(top: 4),
@@ -233,7 +237,12 @@ class _EntryRow extends StatelessWidget {
         Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(spec?.fullName ?? 'Player', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
-            SideText(side: l['side'] as String, line: (l['line'] as num).toDouble(), rest: l['statLabel'] as String, size: 14),
+            SideText(
+                side: l['side'] as String,
+                line: (l['line'] as num).toDouble(),
+                rest: l['statLabel'] as String,
+                size: 14,
+                label: l['sideLabel'] as String?),
           ]),
         ),
         _resultIcon(l['result'] as String?),

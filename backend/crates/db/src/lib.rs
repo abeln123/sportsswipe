@@ -6,6 +6,7 @@ pub mod catalog;
 pub mod contests;
 pub mod grading;
 pub mod jobs;
+pub mod packs;
 pub mod picks;
 pub mod slate;
 

@@ -6,6 +6,7 @@ mod error;
 mod export;
 mod game;
 mod invites;
+mod packs;
 mod profile;
 mod social;
 mod state;
@@ -41,6 +42,7 @@ async fn main() -> anyhow::Result<()> {
         .merge(profile::routes())
         .merge(analyst::routes())
         .merge(export::routes())
+        .merge(packs::routes())
         .route("/healthz", get(|| async { "ok" }));
 
     let mut app = Router::new()

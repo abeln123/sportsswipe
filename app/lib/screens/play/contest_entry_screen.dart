@@ -223,7 +223,10 @@ class _ContestEntryScreenState extends ConsumerState<ContestEntryScreen> {
           ),
         );
       }),
-      SwipeButtons(swipe: _swipe, hint: 'Swipe to choose'),
+      const Padding(
+        padding: EdgeInsets.symmetric(vertical: 12),
+        child: Center(child: Text('Swipe right for Over · left for Under', style: TextStyle(color: C.dim, fontSize: 13))),
+      ),
       if (_answers.isNotEmpty) Align(alignment: Alignment.centerRight, child: ArrowLink('Review draft', onTap: () => setState(() => _reviewing = true))),
       const SizedBox(height: 10),
       const Text('Arrow keys work when the card is focused. No coin wager. Submit after reviewing every prediction.', style: T.dim),

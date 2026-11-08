@@ -73,6 +73,9 @@ class CardSpec {
 
   bool get isNfl => league == 'nfl';
   String get leagueLabel => league.toUpperCase();
+
+  /// A team card, used for moneyline, spread and total markets.
+  bool get isTeam => position == 'TEAM';
 }
 
 class MarketInfo {
@@ -89,7 +92,12 @@ class MarketInfo {
         matchup = j['matchup'] as String? ?? '',
         gameStatus = j['gameStatus'] as String? ?? 'scheduled',
         communityTotal = ((j['community'] as Map?)?['total'] as num?)?.toInt() ?? 0,
-        overPct = ((j['community'] as Map?)?['overPct'] as num?)?.toInt() ?? 50;
+        overPct = ((j['community'] as Map?)?['overPct'] as num?)?.toInt() ?? 50,
+        isGame = j['kind'] == 'game',
+        overLabel = j['overLabel'] as String? ?? 'Over',
+        underLabel = j['underLabel'] as String? ?? 'Under',
+        homeAbbr = j['homeAbbr'] as String? ?? '',
+        awayAbbr = j['awayAbbr'] as String? ?? '';
 
   final int marketId;
   final int lineVersion;
@@ -104,6 +112,22 @@ class MarketInfo {
   final String gameStatus;
   final int communityTotal;
   final int overPct;
+
+  /// Moneyline, spread or total, graded on the game score from the home side.
+  final bool isGame;
+
+  /// What a right (Over) and left (Under) swipe mean, e.g. "BUF -3.5".
+  final String overLabel;
+  final String underLabel;
+  final String homeAbbr;
+  final String awayAbbr;
+
+  /// "Over 24.5" for players, "BUF -3.5" for games.
+  String pickText(String side) => isGame
+      ? '${side == 'over' ? overLabel : underLabel}${statKey == 'moneyline' ? ' to win' : ''}'
+      : '${side == 'over' ? 'Over' : 'Under'} ${_line(line)}';
+
+  static String _line(double v) => v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(1);
 }
 
 class Mastery {
@@ -130,10 +154,19 @@ class PlayableCard {
       : card = CardSpec.fromJson((j['card'] as Map).cast<String, dynamic>()),
         market = MarketInfo.fromJson((j['market'] as Map).cast<String, dynamic>()),
         recentForm = ((j['recentForm'] as List?) ?? []).map((e) => (e as num).toDouble()).toList(),
-        mastery = Mastery.fromJson((j['mastery'] as Map?)?.cast<String, dynamic>());
+        mastery = Mastery.fromJson((j['mastery'] as Map?)?.cast<String, dynamic>()),
+        packId = j['packId'] as String?;
 
   final CardSpec card;
   final MarketInfo market;
   final List<double> recentForm;
   final Mastery mastery;
+
+  /// The pack this card was dealt from, if any.
+  final String? packId;
+
+  /// Short name for receipts: "J. Allen" or "BUF vs MIA".
+  String get subject => card.isTeam
+      ? '${market.awayAbbr} at ${market.homeAbbr}'
+      : (card.firstName.isEmpty ? card.fullName : '${card.firstName[0]}. ${card.lastName}');
 }

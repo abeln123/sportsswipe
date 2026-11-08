@@ -6,14 +6,21 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../card/card_spec.dart';
 import '../../card/sport_card.dart';
+import '../../core/api.dart';
 import '../../core/format.dart' as f;
 import '../../core/payout.dart';
 import '../../core/theme.dart';
-import '../../state/immersive.dart';
 import '../../state/pick_queue.dart';
+import '../../state/play.dart';
+import '../../state/receipt.dart';
+import '../../state/swipe_coach.dart';
 import '../../ui/swipe.dart';
 import '../../ui/widgets.dart';
-import 'single_deck.dart';
+
+Future<List<PlayableCard>> loadDeck(String sport, {int limit = 8}) async {
+  final r = await api.get('/deck?sport=$sport&limit=$limit');
+  return (r['cards'] as List).map((e) => PlayableCard.fromJson((e as Map).cast<String, dynamic>())).toList();
+}
 
 class Leg {
   Leg(this.card, this.side);
@@ -62,8 +69,6 @@ class _ParlayDeckState extends ConsumerState<ParlayDeck> {
     }
   }
 
-  void _immersive(bool on) => ref.read(immersiveProvider.notifier).set(on);
-
   void _skip() => setState(() {
         final q = _queue!;
         if (q.length > 1) q.add(q.removeAt(0));
@@ -93,7 +98,6 @@ class _ParlayDeckState extends ConsumerState<ParlayDeck> {
   void _add(String side) {
     if (_legs.length >= maxLegs) return;
     setState(() => _legs.add(Leg(_queue!.removeAt(0), side)));
-    if (_legs.length >= maxLegs || _queue!.isEmpty) _immersive(false);
   }
 
   bool _inDraft(PlayableCard c) => _legs.any((l) => l.card.market.marketId == c.market.marketId);
@@ -126,7 +130,11 @@ class _ParlayDeckState extends ConsumerState<ParlayDeck> {
                   Expanded(
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                       Text(l.card.card.fullName, style: T.h3),
-                      SideText(side: l.side, line: l.card.market.line, rest: l.card.market.statLabel),
+                      SideText(
+                          side: l.side,
+                          line: l.card.market.line,
+                          rest: l.card.market.statLabel,
+                          label: l.card.market.isGame ? l.card.market.pickText(l.side) : null),
                     ]),
                   ),
                   IconButton(
@@ -197,15 +205,18 @@ class _ParlayDeckState extends ConsumerState<ParlayDeck> {
       _legs = [];
       _stake = 0;
     });
-    toast(context, '${legs.length}-leg parlay locked.', action: 'Undo', duration: undoWindow, onAction: () {
-      if (q.undo(id) && mounted) {
+    ref.read(receiptProvider.notifier).show(
+      id,
+      '${legs.length}-leg parlay · ${parlayMultiplier(legs.length)}× · ${stake == 0 ? 'Free entry' : '${f.coins(stake)} coins'}',
+      onUndo: () {
+        if (!mounted) return;
         setState(() {
           _legs = legs;
           _pendingId = null;
           _submitted = null;
         });
-      }
-    });
+      },
+    );
   }
 
   Widget _slots() {
@@ -233,7 +244,13 @@ class _ParlayDeckState extends ConsumerState<ParlayDeck> {
               if (i < _legs.length) ...[
                 Text(_legs[i].card.card.lastName.isEmpty ? _legs[i].card.card.fullName : _legs[i].card.card.lastName,
                     maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                Text('${_legs[i].side == 'over' ? 'O' : 'U'} ${f.line(_legs[i].card.market.line)}', style: T.small),
+                Text(
+                    _legs[i].card.market.isGame
+                        ? _legs[i].card.market.pickText(_legs[i].side)
+                        : '${_legs[i].side == 'over' ? 'O' : 'U'} ${f.line(_legs[i].card.market.line)}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: T.small),
               ] else
                 Text(i == 0 ? 'First leg' : i == 1 ? 'Second' : 'Optional', style: T.small.copyWith(fontSize: 12.5)),
             ]),
@@ -247,23 +264,11 @@ class _ParlayDeckState extends ConsumerState<ParlayDeck> {
     if (_error != null) return ErrorText(_error!, onRetry: _reload);
     if (_queue == null) return const Loading.card();
     final queue = _queue!;
-    final immersive = ref.watch(immersiveProvider);
     final n = _legs.length;
     final full = n >= maxLegs;
     final done = queue.isEmpty;
     return Column(children: [
-      Collapse(
-        visible: !immersive,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
-          child: Row(children: [
-            Text('$n ${n == 1 ? 'leg' : 'legs'} added', style: T.h3.copyWith(fontSize: 15)),
-            const Spacer(),
-            const Text('All legs must hit', style: T.small),
-          ]),
-        ),
-      ),
-      Padding(padding: const EdgeInsets.symmetric(horizontal: 20), child: _slots()),
+      Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: _slots()),
       Expanded(
         child: AnimatedSwitcher(
           duration: const Duration(milliseconds: 220),
@@ -287,25 +292,31 @@ class _ParlayDeckState extends ConsumerState<ParlayDeck> {
                     ]),
                   ),
                 ])
-              : Column(key: const ValueKey('deck'), children: [
-                  Expanded(
-                    child: CardStage(
-                      swipeKey: _swipe,
-                      topId: queue.first.market.marketId,
-                      top: _card(queue.first, queue.length),
-                      next: queue.length > 1 ? _card(queue[1], queue.length - 1) : null,
-                      onSwipe: _add,
-                      onSkip: _skip,
-                      onEngage: () => _immersive(true),
-                      onPullDown: () => _immersive(false),
-                    ),
-                  ),
-                  SwipeButtons(swipe: _swipe, hint: immersive ? null : 'Swipe to add a leg · up to skip'),
-                ]),
+              : CardStage(
+                  key: const ValueKey('deck'),
+                  swipeKey: _swipe,
+                  topId: queue.first.market.marketId,
+                  top: _card(queue.first, queue.length),
+                  next: queue.length > 1 ? _card(queue[1], queue.length - 1) : null,
+                  coach: ref.watch(swipeCoachProvider),
+                  onSwipe: (side) {
+                    ref.read(swipeCoachProvider.notifier).done();
+                    _add(side);
+                  },
+                  onSkip: () {
+                    ref.read(swipeCoachProvider.notifier).done();
+                    _skip();
+                  },
+                  overLabel: queue.first.market.isGame ? queue.first.market.overLabel.toUpperCase() : 'OVER',
+                  underLabel: queue.first.market.isGame ? queue.first.market.underLabel.toUpperCase() : 'UNDER',
+                  onEngage: () => ref.read(playMenuProvider.notifier).close(),
+                  onPull: (dy) => playMenuPull.value = dy,
+                  onPullDown: () => ref.read(playMenuProvider.notifier).open(),
+                ),
         ),
       ),
       Collapse(
-        visible: !immersive || n >= 2 || full || done,
+        visible: n >= 2 || full || done,
         alignment: Alignment.bottomCenter,
         child: Container(
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
