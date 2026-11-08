@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show ScrollCacheExtent;
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
@@ -148,9 +149,13 @@ class _PackStoreState extends ConsumerState<PackStore> {
       final prefs = await SharedPreferences.getInstance();
       if (!mounted) return;
       final saved = prefs.getString(_pendingKey);
-      if (saved != null) await _purchase(jsonDecode(saved) as Map<String, dynamic>);
+      if (saved != null) {
+        await _purchase(jsonDecode(saved) as Map<String, dynamic>);
+      }
     } finally {
-      _buying = false;
+      if (mounted) {
+        setState(() => _buying = false);
+      }
     }
   }
 
@@ -173,7 +178,9 @@ class _PackStoreState extends ConsumerState<PackStore> {
       if (!mounted) return;
       await _purchase(command);
     } finally {
-      _buying = false;
+      if (mounted) {
+        setState(() => _buying = false);
+      }
     }
   }
 
@@ -287,102 +294,121 @@ class _PackStoreState extends ConsumerState<PackStore> {
     return RefreshIndicator(
       onRefresh: _load,
       color: C.green,
-      child: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 6, 16, 28),
-        children: [
-          const Text('Packs', style: T.h1),
-          if (_data?['presentationAvailable'] == true) ...[
-            const SizedBox(height: 14),
-            InkWell(
-              onTap: _buying
-                  ? null
-                  : () async {
-                      if (_buying) return;
-                      setState(() => _buying = true);
-                      try {
-                        final r = await api.post('/admin/presentation-pack', {});
-                        if (!mounted) return;
-                        final cards = (r['cards'] as List).map((c) => PlayableCard.fromJson((c as Map).cast<String, dynamic>())).toList();
-                        setState(() {
-                          _session = _Session(
-                            id: 'presentation',
-                            title: 'Presentation Pack',
-                            cards: cards,
-                            presentation: true,
-                            pack: const FoilPack(
-                              name: 'Presentation Pack',
-                              colors: [Color(0xFF583B91), Color(0xFFC9F6FF)],
-                              badge: 'ADMIN',
-                              caption: '5 fixed cards · Diamond unlocked',
-                              width: 220,
-                            ),
-                          );
-                          _opening = true;
-                        });
-                      } on ApiException catch (e) {
-                        if (mounted) toast(context, e.message, ok: false);
-                      } finally {
-                        if (mounted) setState(() => _buying = false);
-                      }
-                    },
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: C.surface,
-                  border: Border.all(color: const Color(0xFFB5B4E9)),
-                ),
-                child: Row(
-                  children: [
-                    const FoilPack(name: 'Presentation', colors: [Color(0xFF583B91), Color(0xFFC9F6FF)], width: 66),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+      child: CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        scrollCacheExtent: const ScrollCacheExtent.pixels(180),
+        slivers: [
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
+            sliver: SliverList.list(
+              children: [
+                const Text('Packs', style: T.h1),
+                if (_data?['presentationAvailable'] == true || ref.watch(sessionProvider).value?.isAdmin == true) ...[
+                  const SizedBox(height: 14),
+                  InkWell(
+                    onTap: _buying
+                        ? null
+                        : () async {
+                            if (_buying) return;
+                            setState(() => _buying = true);
+                            try {
+                              final r = await api.post('/admin/presentation-pack', {});
+                              if (!mounted) return;
+                              final cards = (r['cards'] as List)
+                                  .map((c) => PlayableCard.fromJson((c as Map).cast<String, dynamic>()))
+                                  .toList();
+                              setState(() {
+                                _session = _Session(
+                                  id: 'presentation',
+                                  title: 'Presentation Pack',
+                                  cards: cards,
+                                  presentation: true,
+                                  pack: const FoilPack(
+                                    name: 'Presentation Pack',
+                                    colors: [Color(0xFF583B91), Color(0xFFC9F6FF)],
+                                    badge: 'ADMIN',
+                                    caption: '5 fixed cards · Diamond unlocked',
+                                    width: 220,
+                                  ),
+                                );
+                                _opening = true;
+                              });
+                            } on ApiException catch (e) {
+                              if (mounted) toast(context, e.message, ok: false);
+                            } finally {
+                              if (mounted) setState(() => _buying = false);
+                            }
+                          },
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: C.surface,
+                        border: Border.all(color: const Color(0xFFB5B4E9)),
+                      ),
+                      child: Row(
                         children: [
-                          const Text('ADMIN ONLY', style: T.label),
-                          const SizedBox(height: 6),
-                          const Text('Presentation Pack', style: T.h2),
-                          const SizedBox(height: 4),
-                          Text(_buying ? 'Preparing…' : '5 fixed cards · 400/400 Diamond ready', style: T.small),
+                          const FoilPack(name: 'Presentation', colors: [Color(0xFF583B91), Color(0xFFC9F6FF)], width: 66),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text('ADMIN ONLY', style: T.label),
+                                const SizedBox(height: 6),
+                                const Text('Presentation Pack', style: T.h2),
+                                const SizedBox(height: 4),
+                                Text(_buying ? 'Preparing…' : '5 fixed cards · 400/400 Diamond ready', style: T.small),
+                              ],
+                            ),
+                          ),
                         ],
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(height: 14),
+                ],
+                const SizedBox(height: 4),
+                const Text('Open a pack and swipe every card. Results settle after each game.', style: T.dim),
+                if (leftovers > 0) ...[const SizedBox(height: 16), _LeftoverStrip(count: leftovers, onPlay: _leftovers)],
+                for (final c in challenges) ...[const SizedBox(height: 12), _ChallengeRow(c.cast<String, dynamic>())],
+                for (final p in featured) ...[
+                  const SizedBox(height: 18),
+                  _FeaturedPack(offer: p, sheen: _sheen, onTap: p.soldOut ? null : () => _buy(p)),
+                ],
+                const SizedBox(height: 22),
+                const Text('10-COIN PACKS', style: T.label),
+                const SizedBox(height: 10),
+              ],
+            ),
+          ),
+          SliverPadding(padding: const EdgeInsets.symmetric(horizontal: 16), sliver: _grid(regular)),
+          if (teams.isNotEmpty) ...[
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              sliver: SliverList.list(
+                children: [
+                  const SizedBox(height: 28),
+                  const Text('TEAM PACKS · 50 COINS', style: T.label),
+                  const SizedBox(height: 6),
+                  const Text('Choose your team. Five cards from all positions and game lines.', style: T.small),
+                  const SizedBox(height: 12),
+                ],
               ),
             ),
-            const SizedBox(height: 14),
+            SliverPadding(padding: const EdgeInsets.symmetric(horizontal: 16), sliver: _grid(teams)),
           ],
-          const SizedBox(height: 4),
-          const Text('Open a pack and swipe every card. Results settle after each game.', style: T.dim),
-          if (leftovers > 0) ...[const SizedBox(height: 16), _LeftoverStrip(count: leftovers, onPlay: _leftovers)],
-          for (final c in challenges) ...[const SizedBox(height: 12), _ChallengeRow(c.cast<String, dynamic>())],
-          for (final p in featured) ...[
-            const SizedBox(height: 18),
-            _FeaturedPack(offer: p, sheen: _sheen, onTap: p.soldOut ? null : () => _buy(p)),
-          ],
-          const SizedBox(height: 22),
-          const Text('10-COIN PACKS', style: T.label),
-          const SizedBox(height: 10),
-          _grid(regular),
-          if (teams.isNotEmpty) ...[
-            const SizedBox(height: 28),
-            const Text('TEAM PACKS · 50 COINS', style: T.label),
-            const SizedBox(height: 6),
-            const Text('Choose your team. Five cards from all positions and game lines.', style: T.small),
-            const SizedBox(height: 12),
-            _grid(teams),
-          ],
-          const SizedBox(height: 16),
-          const Text('Availability is shared across packs. Cards you own or have played are never dealt again.', style: T.small),
+          const SliverPadding(
+            padding: EdgeInsets.fromLTRB(16, 16, 16, 28),
+            sliver: SliverToBoxAdapter(
+              child: Text('Availability is shared across packs. Cards you own or have played are never dealt again.', style: T.small),
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _grid(List<PackOffer> offers) => GridView.builder(
-    shrinkWrap: true,
-    physics: const NeverScrollableScrollPhysics(),
+  Widget _grid(List<PackOffer> offers) => SliverGrid.builder(
     itemCount: offers.length,
     gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
       crossAxisCount: 2,
@@ -636,88 +662,88 @@ class _ChallengeRow extends StatelessWidget {
   }
 }
 
-class _BuySheet extends StatefulWidget {
+/// Quiet purchase preview: the detailed foil stays on its own cached layer.
+class _BuySheet extends StatelessWidget {
   const _BuySheet({required this.offer, required this.balance});
   final PackOffer offer;
   final int balance;
-
-  @override
-  State<_BuySheet> createState() => _BuySheetState();
-}
-
-class _BuySheetState extends State<_BuySheet> with SingleTickerProviderStateMixin {
-  late final AnimationController _light = AnimationController(vsync: this, duration: const Duration(seconds: 4));
-  PackOffer get offer => widget.offer;
-  int get balance => widget.balance;
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (MediaQuery.of(context).disableAnimations) {
-      _light.stop();
-      _light.value = .4;
-    } else {
-      _light.repeat(reverse: true);
-    }
-  }
-
-  @override
-  void dispose() {
-    _light.dispose();
-    super.dispose();
-  }
-
   @override
   Widget build(BuildContext context) {
     final short = balance < offer.price;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Center(
-          child: AnimatedBuilder(
-            animation: _light,
-            builder: (_, _) => offer.art(width: 150, sheen: .2 + _light.value * .6),
-          ),
+        Row(
+          children: [
+            const Expanded(child: Text('PACK PREVIEW', style: T.label)),
+            IconButton(
+              tooltip: 'Close preview',
+              onPressed: () => Navigator.pop(context, false),
+              icon: const Icon(Icons.close, size: 20, color: C.dim),
+            ),
+          ],
         ),
-        const SizedBox(height: 18),
-        Text(offer.name, style: T.h1, textAlign: TextAlign.center),
+        const SizedBox(height: 4),
+        Container(
+          padding: const EdgeInsets.symmetric(vertical: 22),
+          decoration: BoxDecoration(
+            gradient: RadialGradient(radius: .85, colors: [offer.colors.last.withValues(alpha: .1), Colors.transparent]),
+            border: const Border(
+              top: BorderSide(color: C.line),
+              bottom: BorderSide(color: C.line),
+            ),
+          ),
+          child: Center(child: offer.art(width: 132, sheen: .4)),
+        ),
+        const SizedBox(height: 22),
+        Text(offer.name, style: T.h1),
         const SizedBox(height: 6),
-        Text(offer.tagline, style: T.dim, textAlign: TextAlign.center),
-        const SizedBox(height: 18),
-        _line('Cards in this pack', '${offer.size}'),
-        _line('Packs left to buy', '${offer.packsRemaining}'),
+        Text(offer.tagline, style: T.dim),
+        const SizedBox(height: 20),
+        Row(
+          children: [
+            Expanded(child: _detail('${offer.size}', 'CARDS')),
+            Container(width: 1, height: 36, color: C.line),
+            Expanded(
+              child: Padding(padding: const EdgeInsets.only(left: 24), child: _detail('${offer.packsRemaining}', 'PACKS LEFT')),
+            ),
+            const CoinGlyph(size: 19, color: Color(0xFFE9DCA7)),
+            const SizedBox(width: 7),
+            Text(f.coins(offer.price), style: T.h2),
+          ],
+        ),
+        const SizedBox(height: 20),
         if (offer.challenge) ...[
-          _line('Goal', 'Hit ${offer.targetPct}% of picks'),
-          _line('Pays if you make it', '${f.coins(offer.payout)} coins'),
-        ] else
-          _line('Each right pick', 'Earns coins and mastery'),
-        _line('Balance after', '${f.coins(balance - offer.price)} coins'),
-        const SizedBox(height: 18),
+          Text('Hit ${offer.targetPct}% of your picks to earn ${f.coins(offer.payout)} coins.', style: T.body),
+          const SizedBox(height: 16),
+        ],
         PrimaryButton(
-          short ? 'Not enough coins' : 'Open for ${f.coins(offer.price)} coins',
+          short ? 'Not enough coins' : 'Open pack · ${f.coins(offer.price)} coins',
           onPressed: short
               ? null
               : () {
-                  if (PackFeedback.instance.haptics) HapticFeedback.selectionClick();
+                  if (PackFeedback.instance.haptics) {
+                    HapticFeedback.selectionClick();
+                  }
                   Navigator.pop(context, true);
                 },
         ),
-        const SizedBox(height: 6),
-        Center(
-          child: GhostButton('Not now', color: C.dim, onPressed: () => Navigator.pop(context, false)),
+        const SizedBox(height: 12),
+        Text(
+          short ? 'You need ${f.coins(offer.price - balance)} more coins.' : '${f.coins(balance - offer.price)} coins after opening',
+          style: T.small,
+          textAlign: TextAlign.center,
         ),
       ],
     );
   }
 
-  Widget _line(String a, String b) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 5),
-    child: Row(
-      children: [
-        Text(a, style: T.dim),
-        const Spacer(),
-        Text(b, style: const TextStyle(fontWeight: FontWeight.w700)),
-      ],
-    ),
+  Widget _detail(String value, String label) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(value, style: T.h2),
+      const SizedBox(height: 3),
+      Text(label, style: T.label.copyWith(fontSize: 10, letterSpacing: 1)),
+    ],
   );
 }

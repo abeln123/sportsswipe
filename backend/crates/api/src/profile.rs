@@ -165,6 +165,7 @@ async fn teams(State(state): State<AppState>, _: AuthUser, Query(q): Query<Teams
 }
 
 async fn collection(State(state): State<AppState>, user: AuthUser) -> ApiResult<Json<Value>> {
+    crate::presentation::ensure(&state, user).await?;
     let presentation:Vec<i64>=sqlx::query_scalar("SELECT player_id FROM presentation_entitlements WHERE user_id=$1").bind(user.id).fetch_all(&state.pool).await?;
     let total: i64 = sqlx::query_scalar("SELECT count(*) FROM card_series").fetch_one(&state.pool).await?;
     let owned: Vec<(i64, i64, Option<String>)> = sqlx::query_as(

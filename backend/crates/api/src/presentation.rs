@@ -1,11 +1,29 @@
 //! Repeatable, explicitly synthetic judging pack. Every entry point requires admin.
-use crate::{auth::AdminUser, error::ApiResult, state::AppState};
+use crate::{auth::{AdminUser, AuthUser}, error::ApiResult, state::AppState};
 use axum::{extract::State, routing::post, Json, Router};
 use serde_json::{json, Value};
 pub fn routes() -> Router<AppState> {
     Router::new().route("/admin/presentation-pack", post(open))
 }
 async fn open(State(state): State<AppState>, AdminUser(admin): AdminUser) -> ApiResult<Json<Value>> {
+    let ids = provision(&state, admin).await?;
+    let cards = ss_db::cards::playable_cards(&state.pool, Some(admin.id), &ids).await?;
+    Ok(Json(json!({"cards":cards,"name":"Presentation Pack","presentation":true})))
+}
+
+/// Only server-verified admins receive synthetic demo progress.
+/// Called on collection/catalog entry as well as opening the pack, so the
+/// presentation Diamond is ready before the judge visits the collection.
+pub async fn ensure(state: &AppState, user: AuthUser) -> ApiResult<()> {
+    if !user.is_admin { return Ok(()); }
+    let ready: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM presentation_entitlements pe JOIN mastery_totals mt ON mt.user_id=pe.user_id AND mt.player_id=pe.player_id JOIN equipped_finishes ef ON ef.user_id=pe.user_id AND ef.player_id=pe.player_id WHERE pe.user_id=$1 AND mt.correct_count>=400 AND ef.finish='diamond') AND (SELECT count(*) FROM presentation_cards pc JOIN mastery_totals mt ON mt.player_id=pc.player_id WHERE mt.user_id=$1)=5")
+        .bind(user.id).fetch_one(&state.pool).await?;
+    if !ready { provision(state, user).await?; }
+    Ok(())
+}
+
+async fn provision(state: &AppState, admin: AuthUser) -> ApiResult<Vec<i64>> {
+    if !admin.is_admin { return Err(crate::error::ApiError::Forbidden("Admin only.".into())); }
     let mut tx = state.pool.begin().await?;
     sqlx::query("SELECT pg_advisory_xact_lock(761245001)").execute(&mut *tx).await?;
     let team:i64=sqlx::query_scalar("INSERT INTO teams(league,espn_id,abbr,name,short_name,color_primary,color_alt) VALUES ('nfl','ss-presentation','SSP','Sports Swipe Presentation','Presentation','784CC6','DDEAFF') ON CONFLICT(league,espn_id) DO UPDATE SET name=EXCLUDED.name RETURNING id").fetch_one(&mut *tx).await?;
@@ -32,9 +50,9 @@ async fn open(State(state): State<AppState>, AdminUser(admin): AdminUser) -> Api
         sqlx::query("INSERT INTO mastery_totals(user_id,player_id,correct_count) VALUES ($1,$2,$3) ON CONFLICT(user_id,player_id) DO UPDATE SET correct_count=GREATEST(mastery_totals.correct_count,EXCLUDED.correct_count)").bind(admin.id).bind(pid).bind(if i==0{400i64}else{1i64}).execute(&mut *tx).await?;
         if i == 0 {
             sqlx::query("INSERT INTO presentation_entitlements(user_id,player_id,season) VALUES ($1,$2,EXTRACT(YEAR FROM now())) ON CONFLICT DO NOTHING").bind(admin.id).bind(pid).execute(&mut *tx).await?;
-            let purchase:uuid::Uuid=sqlx::query_scalar("INSERT INTO cosmetic_purchases(user_id,command_id,finish,price,player_id) SELECT $1,gen_random_uuid(),'diamond',0,$2 WHERE NOT EXISTS(SELECT 1 FROM equipped_finishes WHERE user_id=$1 AND player_id=$2) RETURNING id").bind(admin.id).bind(pid).fetch_optional(&mut *tx).await?.unwrap_or(uuid::Uuid::nil());
+            let purchase:uuid::Uuid=sqlx::query_scalar("INSERT INTO cosmetic_purchases(user_id,command_id,finish,price,player_id) SELECT $1,gen_random_uuid(),'diamond',0,$2 WHERE NOT EXISTS(SELECT 1 FROM equipped_finishes WHERE user_id=$1 AND player_id=$2 AND finish='diamond') RETURNING id").bind(admin.id).bind(pid).fetch_optional(&mut *tx).await?.unwrap_or(uuid::Uuid::nil());
             if !purchase.is_nil() {
-                sqlx::query("INSERT INTO equipped_finishes VALUES ($1,$2,'diamond',$3) ON CONFLICT DO NOTHING")
+                sqlx::query("INSERT INTO equipped_finishes VALUES ($1,$2,'diamond',$3) ON CONFLICT(user_id,player_id) DO UPDATE SET finish='diamond',purchase_id=EXCLUDED.purchase_id")
                     .bind(admin.id)
                     .bind(pid)
                     .bind(purchase)
@@ -52,6 +70,5 @@ async fn open(State(state): State<AppState>, AdminUser(admin): AdminUser) -> Api
         ids.push(market);
     }
     tx.commit().await?;
-    let cards = ss_db::cards::playable_cards(&state.pool, Some(admin.id), &ids).await?;
-    Ok(Json(json!({"cards":cards,"name":"Presentation Pack","presentation":true})))
+    Ok(ids)
 }

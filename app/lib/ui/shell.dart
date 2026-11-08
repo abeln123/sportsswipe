@@ -108,7 +108,7 @@ class AppHeader extends ConsumerWidget {
     return SizedBox(
       height: 48,
       child: Padding(
-        padding: EdgeInsets.only(left: play ? 8 : 16, right: play ? 4 : 16),
+        padding: EdgeInsets.only(left: play ? 8 : 16, right: 16),
         child: Row(
           children: [
             if (play)
@@ -133,7 +133,7 @@ class AppHeader extends ConsumerWidget {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const CoinGlyph(),
+                  const CoinGlyph(size: 22, color: Color(0xFFE9DCA7)),
                   const SizedBox(width: 6),
                   AnimatedSwitcher(
                     duration: const Duration(milliseconds: 200),
@@ -141,8 +141,8 @@ class AppHeader extends ConsumerWidget {
                       loaded ? f.coins(balance) : '—',
                       key: ValueKey(loaded ? balance : -1),
                       style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
+                        fontSize: 21,
+                        fontWeight: FontWeight.w800,
                         color: C.text,
                         fontFeatures: [FontFeature.tabularFigures()],
                       ),

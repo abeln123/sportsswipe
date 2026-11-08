@@ -151,13 +151,9 @@ class _ParlayDeckState extends ConsumerState<ParlayDeck> {
                 ]),
               ),
             const Hr(),
+            const Text('Coin wager', style: T.h3),
             Row(children: [
-              const Text('Coin wager', style: T.h3),
-              const Spacer(),
-              Text('${f.coins(balance)} available', style: T.small),
-            ]),
-            Row(children: [
-              WagerRing(value: stake, max: balance, dark: true, onChanged: (v) => update(() => _stake = v)),
+              WagerControl(value: stake, max: balance, dark: true, onChanged: (v) => update(() => _stake = v)),
               const Spacer(),
               Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
                 const Text('Return if all hit', style: T.small),
@@ -169,7 +165,7 @@ class _ParlayDeckState extends ConsumerState<ParlayDeck> {
                 const Text('Includes wager', style: T.small),
               ]),
             ]),
-            const Text('Drag ring or tap amount · − / + 25', style: T.small),
+            const Text('Tap amount to edit · − / + 25', style: T.small),
             const SizedBox(height: 4),
             Text(stake == 0 ? 'Free entry. Every leg must hit.' : 'A miss on any leg loses ${f.coins(stake)} coins.', style: T.dim),
             const Hr(),

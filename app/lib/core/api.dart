@@ -62,10 +62,7 @@ class Api {
     }
   }
 
-  Map<String, String> get _headers => {
-        'Content-Type': 'application/json',
-        if (_token != null) 'Authorization': 'Bearer $_token',
-      };
+  Map<String, String> get _headers => {'Content-Type': 'application/json', if (_token != null) 'Authorization': 'Bearer $_token'};
 
   /// Returns the raw status and body. Network failures become status 0.
   Future<ApiResponse> raw(String method, String path, {Object? body, Duration timeout = const Duration(seconds: 12)}) async {
@@ -76,7 +73,19 @@ class Api {
       if (body != null) req.body = jsonEncode(body);
       final streamed = await _client.send(req).timeout(timeout);
       final res = await http.Response.fromStream(streamed);
-      final decoded = res.body.isEmpty ? null : jsonDecode(res.body);
+      Object? decoded;
+      try {
+        decoded = res.body.isEmpty ? null : jsonDecode(res.body);
+      } on FormatException {
+        // An older deployment may serve its HTML fallback for a new API route.
+        // Preserve the HTTP status instead of misreporting this as offline.
+        decoded = {
+          'code': 'server_response',
+          'message': res.statusCode == 404
+              ? 'This feature needs the latest server update. Please try again shortly.'
+              : 'The server could not complete this request. Please try again.',
+        };
+      }
       return ApiResponse(res.statusCode, decoded);
     } on TimeoutException {
       return ApiResponse(0, {'code': 'timeout', 'message': 'Checking status…'});
@@ -108,6 +117,7 @@ class Api {
     }
     return json('GET', path);
   }
+
   Future<Map<String, dynamic>> post(String path, [Object? body]) => json('POST', path, body: body ?? {});
   Future<Map<String, dynamic>> patch(String path, Object body) => json('PATCH', path, body: body);
 }

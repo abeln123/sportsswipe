@@ -4,17 +4,19 @@ import 'package:share_plus/share_plus.dart';
 import 'package:flutter/services.dart';
 import 'package:uuid/uuid.dart';
 
+import '../card/card_spec.dart';
+import '../card/jersey_painter.dart';
 import '../core/api.dart';
 import '../core/theme.dart';
 import 'widgets.dart';
 
-Future<void> challengeShare(BuildContext context, {required int playerId, int? marketId}) async {
+Future<void> challengeShare(BuildContext context, {required CardSpec card, int? marketId}) async {
   try {
     final r = await api.get('/friends');
     if (!context.mounted) return;
     await showSheet<void>(
       context,
-      (ctx) => _ChallengeShare(playerId: playerId, marketId: marketId, friends: (r['friends'] as List).cast<Map<String, dynamic>>()),
+      (ctx) => _ChallengeShare(card: card, marketId: marketId, friends: (r['friends'] as List).cast<Map<String, dynamic>>()),
     );
   } on ApiException catch (e) {
     if (context.mounted) toast(context, e.message, ok: false);
@@ -22,8 +24,8 @@ Future<void> challengeShare(BuildContext context, {required int playerId, int? m
 }
 
 class _ChallengeShare extends StatefulWidget {
-  const _ChallengeShare({required this.playerId, this.marketId, required this.friends});
-  final int playerId;
+  const _ChallengeShare({required this.card, this.marketId, required this.friends});
+  final CardSpec card;
   final int? marketId;
   final List<Map<String, dynamic>> friends;
   @override
@@ -46,7 +48,7 @@ class _ChallengeShareState extends State<_ChallengeShare> {
         _opponent = friend?['userId'] as String?;
         final r = await api.post('/head-to-heads', {
           'commandId': _command,
-          'playerId': widget.playerId,
+          'playerId': widget.card.playerId,
           if (widget.marketId != null) 'marketId': widget.marketId,
           if (_opponent != null) 'opponentId': _opponent,
         });
@@ -55,25 +57,14 @@ class _ChallengeShareState extends State<_ChallengeShare> {
       }
       if (!mounted) return;
       if (_opponent != null) {
+        final router = GoRouter.of(context);
         Navigator.pop(context);
-        context.go('/social/head-to-head/$_id');
+        router.go('/social/head-to-head/$_id');
         return;
       }
-      final box = context.findRenderObject() as RenderBox?;
-      try {
-        final r = await SharePlus.instance.share(
-          ShareParams(
-            text: 'Play me in Sports Swipe: 10 cards, one tiebreaker. No coins. Open in your browser: $_url',
-            sharePositionOrigin: box == null ? null : box.localToGlobal(Offset.zero) & box.size,
-          ),
-        );
-        if (!mounted) return;
-        if (r.status != ShareResultStatus.unavailable) {
-          setState(() {});
-          return;
-        }
-      } catch (_) {}
-      if (mounted) setState(() {});
+      // Creating an invitation is asynchronous. Offer Share as a separate tap
+      // so web browsers retain the user gesture required by the share sheet.
+      setState(() {});
     } on ApiException catch (e) {
       if (mounted) setState(() => _error = e.message);
     } finally {
@@ -81,57 +72,139 @@ class _ChallengeShareState extends State<_ChallengeShare> {
     }
   }
 
+  Future<void> _share() async {
+    final box = context.findRenderObject() as RenderBox?;
+    try {
+      await SharePlus.instance.share(
+        ShareParams(
+          text: 'Play me in Sports Swipe: 10 cards, one tiebreaker. No coins. Open in your browser: $_url',
+          sharePositionOrigin: box == null ? null : box.localToGlobal(Offset.zero) & box.size,
+        ),
+      );
+    } catch (_) {
+      if (mounted) {
+        setState(() => _error = 'Sharing is unavailable in this browser. Copy the link below to send your invitation.');
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
-      const Text('Send a card. Start a 1v1.', style: T.h2),
-      const SizedBox(height: 8),
-      const Text(
-        'This card + 9 others. Same lines for both of you. Most correct wins, then the closest total-points tiebreaker. No coins or mastery rewards.',
-        style: T.dim,
+      Row(
+        children: [
+          const Expanded(child: Text('HEAD TO HEAD', style: T.label)),
+          IconButton(
+            tooltip: 'Close invitation',
+            onPressed: () => Navigator.pop(context),
+            icon: const Icon(Icons.close, size: 20, color: C.dim),
+          ),
+        ],
       ),
+      const SizedBox(height: 10),
+      const Text('Challenge a friend', style: T.h1),
+      const SizedBox(height: 18),
+      Container(
+        padding: const EdgeInsets.symmetric(vertical: 18),
+        decoration: const BoxDecoration(
+          border: Border(
+            top: BorderSide(color: C.line),
+            bottom: BorderSide(color: C.line),
+          ),
+        ),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 66,
+              height: 76,
+              child: CustomPaint(painter: JerseyPainter.forLeague(widget.card.league, widget.card.colorway, widget.card.jerseyNumber)),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(widget.card.fullName, style: T.h3),
+                  const SizedBox(height: 4),
+                  Text('${widget.card.teamAbbr} · ${widget.card.leagueLabel}', style: T.small),
+                  const SizedBox(height: 8),
+                  const Text('This card + nine more', style: T.dim),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+      const SizedBox(height: 18),
+      Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(child: _detail('1 vs 1', 'You vs. a friend')),
+          Expanded(child: _detail('10 PICKS', 'Same cards. Same lines.')),
+        ],
+      ),
+      const SizedBox(height: 12),
+      const Text('Most correct wins. Closest total points breaks a tie. No coins at stake.', style: T.small),
       if (_error != null)
         Padding(
-          padding: const EdgeInsets.symmetric(vertical: 12),
+          padding: const EdgeInsets.only(top: 16),
           child: Text(_error!, style: const TextStyle(color: C.danger)),
         ),
+      const SizedBox(height: 24),
       if (_url == null) ...[
-        const SizedBox(height: 16),
-        for (final u in widget.friends)
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: InitialsBadge(initialsOf(u['displayName'] as String)),
-            title: Text(u['displayName'] as String),
-            subtitle: const Text('Send invitation in Messages', style: T.small),
-            trailing: const Icon(Icons.north_east, color: C.green),
-            onTap: _busy ? null : () => _send(u),
-          ),
-        if (widget.friends.isEmpty)
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 12),
-            child: Text('Invite someone new with a link. They can sign up in a browser.', style: T.small),
-          ),
-        PrimaryButton('Invite by text or link', busy: _busy, onPressed: _busy ? null : () => _send()),
+        if (widget.friends.isNotEmpty) ...[
+          const Text('SEND IN MESSAGES', style: T.label),
+          const SizedBox(height: 6),
+          for (final u in widget.friends)
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: InitialsBadge(initialsOf(u['displayName'] as String)),
+              title: Text(u['displayName'] as String, style: T.h3),
+              trailing: const Icon(Icons.arrow_forward, size: 20, color: C.dim),
+              onTap: _busy ? null : () => _send(u),
+            ),
+          const SizedBox(height: 12),
+        ],
+        PrimaryButton('Create invite link', busy: _busy, onPressed: _busy ? null : () => _send()),
+        const SizedBox(height: 12),
+        const Text('Your friend can join in a browser. No download needed.', style: T.small, textAlign: TextAlign.center),
       ] else ...[
-        const SizedBox(height: 16),
+        const Text('INVITATION READY', style: T.label),
+        const SizedBox(height: 10),
         SelectableText(_url!, style: T.dim),
-        TextButton.icon(
-          onPressed: () async {
-            await Clipboard.setData(ClipboardData(text: _url!));
-            if (context.mounted) toast(context, 'Challenge link copied.');
-          },
-          icon: const Icon(Icons.copy, size: 16),
-          label: const Text('Copy invite link'),
-        ),
-        PrimaryButton(
-          'Make my 10 picks',
-          onPressed: () {
-            Navigator.pop(context);
-            context.go('/social/head-to-head/$_id');
-          },
+        const SizedBox(height: 14),
+        PrimaryButton('Send by text or link', onPressed: _share),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            TextButton.icon(
+              onPressed: () async {
+                await Clipboard.setData(ClipboardData(text: _url!));
+                if (context.mounted) toast(context, 'Challenge link copied.');
+              },
+              icon: const Icon(Icons.copy, size: 15),
+              label: const Text('Copy link'),
+            ),
+            TextButton(
+              onPressed: () {
+                final router = GoRouter.of(context);
+                Navigator.pop(context);
+                router.go('/social/head-to-head/$_id');
+              },
+              child: const Text('Make my picks →'),
+            ),
+          ],
         ),
       ],
+    ],
+  );
+  Widget _detail(String label, String text) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(label, style: T.label.copyWith(color: C.text)),
+      const SizedBox(height: 5),
+      Text(text, style: T.small),
     ],
   );
 }

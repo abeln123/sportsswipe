@@ -1,5 +1,3 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -230,7 +228,11 @@ Future<R?> showSheet<R>(BuildContext context, Widget Function(BuildContext) buil
     isScrollControlled: true,
     backgroundColor: C.sheet,
     barrierColor: Colors.black.withValues(alpha: 0.55),
-    shape: const RoundedRectangleBorder(),
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      side: BorderSide(color: C.line),
+    ),
+    clipBehavior: Clip.antiAlias,
     builder: (ctx) => SafeArea(
       child: ConstrainedBox(
         constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.9),
@@ -246,125 +248,141 @@ Future<R?> showSheet<R>(BuildContext context, Widget Function(BuildContext) buil
 void toast(BuildContext context, String message, {String? action, VoidCallback? onAction, bool ok = true, Duration? duration}) {
   final m = ScaffoldMessenger.of(context);
   m.hideCurrentSnackBar();
-  m.showSnackBar(SnackBar(
-    duration: duration ?? const Duration(seconds: 4),
-    content: Row(children: [
-      Icon(ok ? Icons.check : Icons.info_outline, size: 18, color: ok ? C.green : C.danger),
-      const SizedBox(width: 14),
-      Expanded(child: Text(message)),
-    ]),
-    action: action == null ? null : SnackBarAction(label: action, textColor: C.text, onPressed: onAction ?? () {}),
-  ));
+  m.showSnackBar(
+    SnackBar(
+      duration: duration ?? const Duration(seconds: 4),
+      content: Row(
+        children: [
+          Icon(ok ? Icons.check : Icons.info_outline, size: 18, color: ok ? C.green : C.danger),
+          const SizedBox(width: 14),
+          Expanded(child: Text(message)),
+        ],
+      ),
+      action: action == null ? null : SnackBarAction(label: action, textColor: C.text, onPressed: onAction ?? () {}),
+    ),
+  );
 }
 
-/// Wager ring: drag around the ring or tap −/+ in steps of 25.
-class WagerRing extends StatelessWidget {
-  const WagerRing({super.key, required this.value, required this.max, required this.onChanged, this.dark = false, this.size = 92});
-
-  final int value;
-  final int max;
+/// A bounded coin amount: step by 25 or enter an exact value.
+class WagerControl extends StatelessWidget {
+  const WagerControl({super.key, required this.value, required this.max, required this.onChanged, this.dark = false});
+  final int value, max;
   final ValueChanged<int> onChanged;
   final bool dark;
-  final double size;
-
   static const step = 25;
+  int get cap => max.clamp(0, 100000);
 
-  void _fromOffset(Offset local) {
-    final c = Offset(size / 2, size / 2);
-    final d = local - c;
-    var a = math.atan2(d.dx, -d.dy);
-    if (a < 0) a += 2 * math.pi;
-    final frac = a / (2 * math.pi);
-    final cap = math.min(max, 100000);
-    var v = (frac * cap).round();
-    if (frac > 0.97) v = cap;
-    onChanged(v.clamp(0, cap));
+  Future<void> _edit(BuildContext context) async {
+    final result = await showDialog<int>(
+      context: context,
+      builder: (_) => _WagerEntry(value: value, max: cap),
+    );
+    if (result != null) onChanged(result.clamp(0, cap));
   }
 
   @override
   Widget build(BuildContext context) {
     final fg = dark ? C.text : C.ink;
-    final cap = math.max(1, math.min(max, 100000));
-    final btnColor = dark ? C.text : C.ink;
-    return Semantics(
-      label: 'Coin wager',
-      value: '$value coins',
-      increasedValue: '${math.min(value + step, max)} coins',
-      decreasedValue: '${math.max(value - step, 0)} coins',
-      onIncrease: () => onChanged(math.min(value + step, max)),
-      onDecrease: () => onChanged(math.max(value - step, 0)),
-      child: Focus(
-        onKeyEvent: (_, e) {
-          if (e is! KeyDownEvent) return KeyEventResult.ignored;
-          if (e.logicalKey == LogicalKeyboardKey.arrowUp) {
-            onChanged(math.min(value + step, max));
-            return KeyEventResult.handled;
-          }
-          if (e.logicalKey == LogicalKeyboardKey.arrowDown) {
-            onChanged(math.max(value - step, 0));
-            return KeyEventResult.handled;
-          }
-          return KeyEventResult.ignored;
-        },
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
+    return Focus(
+      onKeyEvent: (_, e) {
+        if (e is! KeyDownEvent) return KeyEventResult.ignored;
+        if (e.logicalKey == LogicalKeyboardKey.arrowUp) {
+          onChanged((value + step).clamp(0, cap));
+          return KeyEventResult.handled;
+        }
+        if (e.logicalKey == LogicalKeyboardKey.arrowDown) {
+          onChanged((value - step).clamp(0, cap));
+          return KeyEventResult.handled;
+        }
+        return KeyEventResult.ignored;
+      },
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
           IconButton(
-            onPressed: value > 0 ? () => onChanged(math.max(value - step, 0)) : null,
-            icon: Icon(Icons.remove, color: value > 0 ? btnColor : btnColor.withValues(alpha: 0.3)),
+            tooltip: 'Decrease wager by 25',
+            constraints: const BoxConstraints(minWidth: 40, minHeight: 48),
+            onPressed: value > 0 ? () => onChanged((value - step).clamp(0, cap)) : null,
+            icon: Icon(Icons.remove, color: fg.withValues(alpha: value > 0 ? 1 : .3), size: 20),
           ),
-          GestureDetector(
-            onPanDown: (d) => _fromOffset(d.localPosition),
-            onPanUpdate: (d) => _fromOffset(d.localPosition),
-            child: SizedBox(
-              width: size,
-              height: size,
-              child: CustomPaint(
-                painter: _RingPainter(value / cap, dark),
-                child: Center(
-                  child: Column(mainAxisSize: MainAxisSize.min, children: [
-                    Text(f.coins(value), style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: fg)),
-                    Text('coins', style: TextStyle(fontSize: 12, color: fg.withValues(alpha: 0.7))),
-                  ]),
+          Semantics(
+            label: 'Enter coin wager',
+            value: '$value coins',
+            button: true,
+            child: InkWell(
+              onTap: () => _edit(context),
+              child: Container(
+                constraints: const BoxConstraints(minWidth: 60, minHeight: 54),
+                decoration: BoxDecoration(
+                  border: Border(bottom: BorderSide(color: fg.withValues(alpha: .3))),
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      f.coins(value),
+                      style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: fg),
+                    ),
+                    Text('coins', style: TextStyle(fontSize: 11, color: fg.withValues(alpha: .7))),
+                  ],
                 ),
               ),
             ),
           ),
           IconButton(
-            onPressed: value < max ? () => onChanged(math.min(value + step, max)) : null,
-            icon: Icon(Icons.add, color: value < max ? btnColor : btnColor.withValues(alpha: 0.3)),
+            tooltip: 'Increase wager by 25',
+            constraints: const BoxConstraints(minWidth: 40, minHeight: 48),
+            onPressed: value < cap ? () => onChanged((value + step).clamp(0, cap)) : null,
+            icon: Icon(Icons.add, color: fg.withValues(alpha: value < cap ? 1 : .3), size: 20),
           ),
-        ]),
+        ],
       ),
     );
   }
 }
 
-class _RingPainter extends CustomPainter {
-  _RingPainter(this.frac, this.dark);
-  final double frac;
-  final bool dark;
-
+class _WagerEntry extends StatefulWidget {
+  const _WagerEntry({required this.value, required this.max});
+  final int value, max;
   @override
-  void paint(Canvas canvas, Size s) {
-    final c = s.center(Offset.zero);
-    final r = s.width / 2 - 5;
-    canvas.drawCircle(c, r, Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 5
-      ..color = dark ? const Color(0xFF2F4A40) : const Color(0xFFB9D3C4));
-    final sweep = 2 * math.pi * frac.clamp(0.0, 1.0);
-    if (sweep > 0) {
-      canvas.drawArc(Rect.fromCircle(center: c, radius: r), -math.pi / 2, sweep, false, Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 5
-        ..strokeCap = StrokeCap.round
-        ..color = const Color(0xFF2FA968));
+  State<_WagerEntry> createState() => _WagerEntryState();
+}
+
+class _WagerEntryState extends State<_WagerEntry> {
+  late final _amount = TextEditingController(text: '${widget.value}');
+  String? _error;
+  @override
+  void dispose() {
+    _amount.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final amount = int.tryParse(_amount.text);
+    if (amount == null || amount < 0 || amount > widget.max) {
+      setState(() => _error = 'Enter 0–${f.coins(widget.max)} coins.');
+      return;
     }
-    final a = -math.pi / 2 + sweep;
-    canvas.drawCircle(c + Offset(math.cos(a), math.sin(a)) * r, 4.5, Paint()..color = const Color(0xFF2FA968));
+    Navigator.pop(context, amount);
   }
 
   @override
-  bool shouldRepaint(covariant _RingPainter old) => old.frac != frac || old.dark != dark;
+  Widget build(BuildContext context) => AlertDialog(
+    title: const Text('Coin wager'),
+    content: TextField(
+      controller: _amount,
+      autofocus: true,
+      keyboardType: TextInputType.number,
+      textInputAction: TextInputAction.done,
+      inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(6)],
+      decoration: InputDecoration(labelText: 'Amount', suffixText: 'coins', errorText: _error),
+      onSubmitted: (_) => _submit(),
+    ),
+    actions: [
+      TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+      TextButton(onPressed: _submit, child: const Text('Set wager')),
+    ],
+  );
 }
 
 class Labeled extends StatelessWidget {

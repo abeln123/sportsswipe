@@ -123,7 +123,7 @@ class SportCard extends StatelessWidget {
                     ),
                     IconButton(
                       tooltip: 'Share card and start a head-to-head',
-                      onPressed: () => challengeShare(context, playerId: spec.playerId, marketId: market?.marketId),
+                      onPressed: () => challengeShare(context, card: spec, marketId: market?.marketId),
                       icon: Icon(Icons.near_me_outlined, size: 18 * s, color: C.ink),
                       constraints: const BoxConstraints(minWidth: 40, minHeight: 44),
                       padding: const EdgeInsets.all(8),

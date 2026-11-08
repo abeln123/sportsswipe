@@ -12,7 +12,6 @@ import '../../core/payout.dart';
 import '../../core/theme.dart';
 import '../../state/pick_queue.dart';
 import '../../state/play.dart';
-import '../../state/research.dart';
 import '../../state/receipt.dart';
 import '../../state/swipe_coach.dart';
 import '../../ui/swipe.dart';
@@ -276,32 +275,11 @@ class _PackDeckState extends ConsumerState<PackDeck> {
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (!m.isGame)
-            Align(
-              alignment: Alignment.centerRight,
-              child: TextButton.icon(
-                onPressed: () {
-                  ref.read(researchRequestProvider.notifier).ask({
-                    'question': '${card.card.fullName} · recent ${m.statLabel.toLowerCase()}',
-                    'form': <String, dynamic>{'playerId': card.card.playerId, 'statKey': m.statKey, 'n': 5},
-                  });
-                  context.go('/ai');
-                },
-                icon: const Icon(Icons.query_stats, size: 16),
-                label: const Text('Ask AI'),
-              ),
-            ),
           Container(height: 1, color: const Color(0xFFCBD3DB), margin: const EdgeInsets.only(top: 8, bottom: 10)),
+          const Text('Coin wager', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
           Row(
             children: [
-              const Text('Coin wager', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
-              const Spacer(),
-              Text('${f.coins(balance)} available', style: const TextStyle(fontSize: 12.5, color: C.inkDim)),
-            ],
-          ),
-          Row(
-            children: [
-              WagerRing(value: stake, max: balance, size: 84, onChanged: (v) => setState(() => _stakes[m.marketId] = v)),
+              WagerControl(value: stake, max: balance, onChanged: (v) => setState(() => _stakes[m.marketId] = v)),
               const Spacer(),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
@@ -330,7 +308,7 @@ class _PackDeckState extends ConsumerState<PackDeck> {
               ),
             ],
           ),
-          const Text('Drag ring or tap amount · − / + 25', style: TextStyle(fontSize: 10.5, color: C.inkDim)),
+          const Text('Tap amount to edit · − / + 25', style: TextStyle(fontSize: 10.5, color: C.inkDim)),
           const SizedBox(height: 4),
           Text(
             stake == 0 ? 'Free pick. No coins at risk.' : 'Wrong call loses ${f.coins(stake)} coins.',

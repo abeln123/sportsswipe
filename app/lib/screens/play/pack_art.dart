@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart' show listEquals;
 
 import '../../core/theme.dart';
 import 'pack_feedback.dart';
@@ -47,10 +48,12 @@ class FoilPack extends StatelessWidget {
         : const Color(0xFFF6F3E7);
     final h = width * foilPackHeightRatio;
     final title = name.replaceFirst(RegExp(r'\s+pack$', caseSensitive: false), '\nPack');
-    return SizedBox(
+    return RepaintBoundary(child: SizedBox(
       width: width,
       height: h,
       child: CustomPaint(
+        isComplex: true,
+        willChange: tension != 0,
         painter: _FoilPainter(palette, sheen, tension),
         child: Padding(
           padding: EdgeInsets.fromLTRB(width * .15, h * .17, width * .13, h * .14),
@@ -97,7 +100,7 @@ class FoilPack extends StatelessWidget {
           ),
         ),
       ),
-    );
+    ));
   }
 }
 
@@ -289,7 +292,7 @@ class _FoilPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_FoilPainter old) => old.sheen != sheen || old.tension != tension || old.colors != colors;
+  bool shouldRepaint(_FoilPainter old) => old.sheen != sheen || old.tension != tension || !listEquals(old.colors, colors);
 }
 
 /// The back of a Sports Swipe card.
