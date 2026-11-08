@@ -15,6 +15,7 @@ import '../../core/format.dart' as f;
 import '../../core/theme.dart';
 import '../../state/pick_queue.dart';
 import '../../state/session.dart';
+import '../../ui/shell.dart' show CoinGlyph;
 import '../../ui/widgets.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
@@ -36,29 +37,72 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const SizedBox(height: 6),
-        UnderTabs(labels: const ['Profile', 'Collection', 'Store'], index: _tab, onChanged: (i) => setState(() => _tab = i)),
-        switch (_tab) {
-          0 => const _ProfileTab(),
-          1 => _CollectionTab(onStore: () => setState(() => _tab = 2)),
-          _ => const _StoreTab(),
-        },
+        Material(
+          color: C.bg,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 6),
+            child: UnderTabs(
+              labels: const ['Profile', 'Collection', 'Store'],
+              index: _tab,
+              onChanged: (i) => setState(() => _tab = i),
+            ),
+          ),
+        ),
+        Expanded(
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              const Positioned.fill(child: PineBackdrop()),
+              ListView(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+                children: [
+                  switch (_tab) {
+                    0 => const _ProfileTab(),
+                    1 => _CollectionTab(onStore: () => setState(() => _tab = 2)),
+                    _ => const _StoreTab(),
+                  },
+                ],
+              ),
+            ],
+          ),
+        ),
       ],
     );
   }
 }
 
 class StatsBlock extends StatelessWidget {
-  const StatsBlock(this.s, {super.key});
+  const StatsBlock(this.s, {super.key, this.topCards});
   final Map<String, dynamic> s;
+  final List<Map<String, dynamic>>? topCards;
+
+  List<Map<String, dynamic>> _resolveTopCards() {
+    if (topCards != null && topCards!.isNotEmpty) {
+      return topCards!.take(3).toList();
+    }
+    final rawTop = s['topCards'];
+    if (rawTop is List && rawTop.isNotEmpty) {
+      return rawTop
+          .whereType<Map>()
+          .map((e) => e.cast<String, dynamic>())
+          .where((e) => e['card'] != null)
+          .take(3)
+          .toList();
+    }
+    final best = (s['bestCard'] as Map?)?.cast<String, dynamic>();
+    if (best != null && best['card'] != null) {
+      return [best];
+    }
+    return const [];
+  }
 
   @override
   Widget build(BuildContext context) {
     final wc = (s['weeklyContest'] as Map).cast<String, dynamic>();
-    final best = (s['bestCard'] as Map?)?.cast<String, dynamic>();
+    final cards = _resolveTopCards();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -84,26 +128,27 @@ class StatsBlock extends StatelessWidget {
           wc['rank'] == null ? 'No rank yet this week.' : 'Rank #${wc['rank']} this week.',
           style: T.dim,
         ),
-        if (best != null && best['card'] != null) ...[
+        if (cards.isNotEmpty) ...[
           const Hr(v: 22),
-          const Text('Top card', style: T.h3),
-          const SizedBox(height: 12),
           Row(
             children: [
-              JerseyIcon(spec: CardSpec.fromJson((best['card'] as Map).cast<String, dynamic>()), size: 44),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text((best['card'] as Map)['fullName'] as String, style: T.h3),
-                    Text(
-                      '${f.cap((best['mastery'] as Map)['tier'] as String)} · ${(best['mastery'] as Map)['count']} correct calls',
-                      style: T.small,
-                    ),
-                  ],
+              const Text('Top cards', style: T.h3),
+              const Spacer(),
+              Text('Top ${cards.length}', style: T.small),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              for (var i = 0; i < 3; i++) ...[
+                if (i > 0) const SizedBox(width: 10),
+                Expanded(
+                  child: i < cards.length
+                      ? _TopCardSlot(data: cards[i], rank: i + 1)
+                      : const SizedBox.shrink(),
                 ),
-              ),
+              ],
             ],
           ),
         ],
@@ -121,6 +166,33 @@ class StatsBlock extends StatelessWidget {
   );
 }
 
+class _TopCardSlot extends StatelessWidget {
+  const _TopCardSlot({required this.data, required this.rank});
+  final Map<String, dynamic> data;
+  final int rank;
+
+  @override
+  Widget build(BuildContext context) {
+    final spec = CardSpec.fromJson((data['card'] as Map).cast<String, dynamic>());
+    final mastery = (data['mastery'] as Map).cast<String, dynamic>();
+    final tier = (mastery['tier'] as String?) ?? 'base';
+    final count = (mastery['count'] as num?)?.toInt() ?? 0;
+    final equipped = (data['finish'] as String?) ?? 'base';
+    final finish = Finish.collectionFinish(equipped, tier);
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      alignment: Alignment.topCenter,
+      child: CardTile(
+        spec: spec,
+        width: 165,
+        finish: finish,
+        tierLabel: '#$rank · ${f.cap(tier)}',
+        progress: '$count correct ${count == 1 ? 'call' : 'calls'}',
+      ),
+    );
+  }
+}
+
 class _ProfileTab extends ConsumerStatefulWidget {
   const _ProfileTab();
 
@@ -129,8 +201,22 @@ class _ProfileTab extends ConsumerStatefulWidget {
 }
 
 class _ProfileTabState extends ConsumerState<_ProfileTab> {
-  Future<Map<String, dynamic>>? _stats;
+  Future<(Map<String, dynamic>, List<Map<String, dynamic>>)>? _stats;
   String? _forUser;
+
+  Future<(Map<String, dynamic>, List<Map<String, dynamic>>)> _loadProfileData(String userId) async {
+    final statsFuture = api.get('/profiles/$userId/stats');
+    final colFuture = api.get('/me/collection').catchError((_) => <String, dynamic>{});
+    final stats = await statsFuture;
+    final col = await colFuture;
+    final rawCards = (col['cards'] as List?)?.whereType<Map>().map((e) => e.cast<String, dynamic>()).toList() ?? <Map<String, dynamic>>[];
+    rawCards.sort((a, b) {
+      final ca = ((a['mastery'] as Map?)?['count'] as num?)?.toInt() ?? 0;
+      final cb = ((b['mastery'] as Map?)?['count'] as num?)?.toInt() ?? 0;
+      return cb.compareTo(ca);
+    });
+    return (stats, rawCards.take(3).toList());
+  }
 
   Future<void> _edit(Me me) async {
     final name = TextEditingController(text: me.displayName);
@@ -578,23 +664,62 @@ class _StoreTab extends ConsumerStatefulWidget {
 }
 
 class _StoreTabState extends ConsumerState<_StoreTab> {
-  late Future<Map<String, dynamic>> _data = api.get('/store/skus');
+  late Future<(Map<String, dynamic>, Map<String, dynamic>)> _data = _loadStore();
   String? _busy;
 
-  static const _swatch = {
-    'bronze': [Color(0xFFE7B48F), Color(0xFFA8643C)],
-    'silver': [Color(0xFFFFFFFF), Color(0xFFB9C2CC)],
-    'gold': [Color(0xFFFFE8A3), Color(0xFFC9972B)],
-    'diamond': [Color(0xFFC9F6FF), Color(0xFFE5CCFF)],
+  static final _showcaseSpec = CardSpec.fromJson(const {
+    'playerId': 1,
+    'cardNo': 1,
+    'series': 'Debut Series',
+    'fullName': 'Josh Allen',
+    'firstName': 'Josh',
+    'lastName': 'Allen',
+    'position': 'QB',
+    'jerseyNumber': '17',
+    'league': 'nfl',
+    'teamAbbr': 'BUF',
+    'teamName': 'Buffalo Bills',
+    'colorway': {'base': '00338D', 'secondary': 'C60C30', 'Num': 'FFFFFF'},
+  });
+
+  static const _finishMeta = {
+    'bronze': ('Warm copper foil', Color(0xFFE7B48F)),
+    'silver': ('Brushed chrome frame', Color(0xFFD9E2EC)),
+    'gold': ('24k championship foil', Color(0xFFFFDF7E)),
+    'diamond': ('Prismatic facet finish', Color(0xFFB5E8FF)),
   };
 
-  Future<void> _buy(String finish, int price) async {
+  Future<(Map<String, dynamic>, Map<String, dynamic>)> _loadStore() async {
+    final skusFuture = api.get('/store/skus');
+    final colFuture = api.get('/me/collection').catchError((_) => <String, dynamic>{});
+    return (await skusFuture, await colFuture);
+  }
+
+  Future<void> _buy(String finish, int price, CardSpec previewSpec) async {
     final ok = await showSheet<bool>(
       context,
       (ctx) => Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text('Buy ${f.cap(finish)} finish', style: T.h1),
+          const SizedBox(height: 16),
+          Center(
+            child: SportCard(
+              spec: previewSpec,
+              variant: CardVariant.tile,
+              showShare: false,
+              width: 190,
+              finish: finish,
+              topRight: finish.toUpperCase(),
+              footer: CardFooter(
+                spec: previewSpec,
+                scale: 190 / 340,
+                finish: finish,
+                left: finish.toUpperCase(),
+                right: _finishMeta[finish]?.$1 ?? 'Cosmetic finish',
+              ),
+            ),
+          ),
           const SizedBox(height: 20),
           PrimaryButton('Buy · ${f.coins(price)} coins', onPressed: () => Navigator.pop(ctx, true)),
           Center(
@@ -613,7 +738,7 @@ class _StoreTabState extends ConsumerState<_StoreTab> {
     if (!mounted) return;
     setState(() {
       _busy = null;
-      _data = api.get('/store/skus');
+      _data = _loadStore();
     });
     if (r.ok) {
       ref.read(summaryProvider.notifier).applyBalance((r.map['balance'] as num).toInt());
@@ -630,90 +755,219 @@ class _StoreTabState extends ConsumerState<_StoreTab> {
       builder: (context, snap) {
         if (snap.hasError) return ErrorText(snap.error!);
         if (!snap.hasData) return const Loading();
-        final d = snap.data!;
+        final (d, col) = snap.data!;
         final balance = (d['balance'] as num).toInt();
         final skus = (d['skus'] as List).cast<Map<String, dynamic>>();
+        final cards = (col['cards'] as List?)?.whereType<Map>().map((e) => e.cast<String, dynamic>()).toList() ?? const [];
+        final unassigned = (col['unassignedFinishes'] as List?)?.whereType<Map>().map((e) => e.cast<String, dynamic>()).toList() ?? const [];
+        final ownedCounts = <String, int>{
+          for (final u in unassigned) (u['finish'] as String): (u['count'] as num).toInt(),
+        };
+        final previewSpec = cards.isNotEmpty
+            ? CardSpec.fromJson((cards.first['card'] as Map).cast<String, dynamic>())
+            : _showcaseSpec;
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const PageTitle('Card store'),
-            const SizedBox(height: 6),
+            const SizedBox(height: 4),
             Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('Coins', style: T.small),
-                    Text(
-                      f.coins(balance),
-                      style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: C.green),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-            const SizedBox(height: 18),
-            for (final s in skus)
-              InkWell(
-                onTap: _busy == null && balance >= (s['price'] as num)
-                    ? () => _buy(s['finish'] as String, (s['price'] as num).toInt())
-                    : null,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  decoration: const BoxDecoration(
-                    border: Border(bottom: BorderSide(color: C.line)),
-                  ),
-                  child: Row(
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Container(
-                        width: 54,
-                        height: 66,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(6),
-                          gradient: LinearGradient(colors: _swatch[s['finish']] ?? const [Colors.white, Colors.grey]),
-                        ),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Text(
-                              'SS',
-                              style: TextStyle(color: C.ink, fontWeight: FontWeight.w900, fontSize: 18),
-                            ),
-                            Text(
-                              (s['finish'] as String).toUpperCase(),
-                              style: const TextStyle(color: C.ink, fontSize: 7, fontWeight: FontWeight.w700),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Text(f.cap(s['finish'] as String), style: T.h3.copyWith(fontSize: 18)),
-                      ),
-                      if (_busy == s['finish'])
-                        const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: C.green))
-                      else
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Text(
-                              f.coins(s['price'] as num),
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w800,
-                                color: balance >= (s['price'] as num) ? C.text : C.faint,
-                              ),
-                            ),
-                            const Text('coins', style: T.small),
-                          ],
-                        ),
+                      Text('COSMETIC FINISHES', style: T.label),
+                      SizedBox(height: 4),
+                      Text('Card store', style: T.h1),
                     ],
                   ),
                 ),
-              ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0E241E),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: C.line),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const CoinGlyph(size: 16, color: Color(0xFFE9DCA7)),
+                      const SizedBox(width: 6),
+                      Text(
+                        f.coins(balance),
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: C.green),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            LayoutBuilder(
+              builder: (context, box) {
+                final tileW = (box.maxWidth - 14) / 2;
+                final cardW = math.min(tileW, 180.0);
+                return Wrap(
+                  spacing: 14,
+                  runSpacing: 22,
+                  children: [
+                    for (final s in skus)
+                      _FinishStoreTile(
+                        finish: s['finish'] as String,
+                        price: (s['price'] as num).toInt(),
+                        affordable: balance >= (s['price'] as num),
+                        busy: _busy == s['finish'],
+                        ownedCount: ownedCounts[s['finish'] as String] ?? 0,
+                        spec: previewSpec,
+                        tileWidth: tileW,
+                        cardWidth: cardW,
+                        subtitle: _finishMeta[s['finish'] as String]?.$1 ?? 'Custom frame',
+                        accent: _finishMeta[s['finish'] as String]?.$2 ?? C.green,
+                        onTap: _busy == null && balance >= (s['price'] as num)
+                            ? () => _buy(s['finish'] as String, (s['price'] as num).toInt(), previewSpec)
+                            : null,
+                      ),
+                  ],
+                );
+              },
+            ),
           ],
         );
       },
+    );
+  }
+}
+
+class _FinishStoreTile extends StatelessWidget {
+  const _FinishStoreTile({
+    required this.finish,
+    required this.price,
+    required this.affordable,
+    required this.busy,
+    required this.ownedCount,
+    required this.spec,
+    required this.tileWidth,
+    required this.cardWidth,
+    required this.subtitle,
+    required this.accent,
+    required this.onTap,
+  });
+
+  final String finish;
+  final int price;
+  final bool affordable;
+  final bool busy;
+  final int ownedCount;
+  final CardSpec spec;
+  final double tileWidth;
+  final double cardWidth;
+  final String subtitle;
+  final Color accent;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: tileWidth,
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: Opacity(
+          opacity: affordable ? 1 : 0.55,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: SportCard(
+                  spec: spec,
+                  variant: CardVariant.tile,
+                  showShare: false,
+                  width: cardWidth,
+                  finish: finish,
+                  topRight: finish.toUpperCase(),
+                  footer: Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 6, 12, 9),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(height: 1, color: const Color(0xFFCBD3DB), margin: const EdgeInsets.only(bottom: 5)),
+                        Row(
+                          children: [
+                            Text(
+                              finish.toUpperCase(),
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 1.1,
+                                color: Finish.accent(finish),
+                              ),
+                            ),
+                            const Spacer(),
+                            Icon(
+                              finish == 'diamond' ? Icons.diamond_outlined : Icons.auto_awesome,
+                              size: 13,
+                              color: Finish.accent(finish),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Container(
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(color: accent, shape: BoxShape.circle),
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      '${f.cap(finish)} finish',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: T.h3,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 2),
+              Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: T.small),
+              const SizedBox(height: 6),
+              if (busy)
+                const SizedBox(
+                  height: 20,
+                  width: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: C.green),
+                )
+              else
+                Row(
+                  children: [
+                    const CoinGlyph(size: 14, color: Color(0xFFE9DCA7)),
+                    const SizedBox(width: 5),
+                    Text(
+                      '${f.coins(price)} coins',
+                      style: TextStyle(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w700,
+                        color: affordable ? C.green : C.dim,
+                      ),
+                    ),
+                    if (ownedCount > 0) ...[
+                      const Spacer(),
+                      Text('$ownedCount owned', style: T.small.copyWith(color: C.text)),
+                    ],
+                  ],
+                ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

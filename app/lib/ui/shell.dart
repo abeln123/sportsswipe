@@ -95,8 +95,9 @@ class _StatusBar extends StatelessWidget {
 
 /// Top bar with one Play menu on the left and the coin balance on the right.
 class AppHeader extends ConsumerWidget {
-  const AppHeader({super.key, this.play = false});
+  const AppHeader({super.key, this.play = false, this.title});
   final bool play;
+  final String? title;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -105,6 +106,7 @@ class AppHeader extends ConsumerWidget {
     final mode = ref.watch(playModeProvider);
     final cards = ref.watch(playCardsProvider);
     final open = ref.watch(playMenuProvider);
+    final heading = title ?? (play ? 'Play' : null);
     void toggle() => ref.read(playMenuProvider.notifier).toggle();
     return SizedBox(
       height: 48,
@@ -112,7 +114,7 @@ class AppHeader extends ConsumerWidget {
         padding: EdgeInsets.only(left: play && cards ? 8 : 20, right: 20),
         child: Row(
           children: [
-            if (play && !cards) const Text('Play', style: T.h2),
+            if (!(play && cards) && heading != null) Text(heading, style: T.h2),
             if (play && cards)
               Semantics(
                 button: true,
@@ -464,17 +466,23 @@ class _AppShellState extends ConsumerState<AppShell> with SingleTickerProviderSt
         bottom: false,
         child: Column(
           children: [
-            AppHeader(play: current == 0),
+            AppHeader(play: current == 0, title: items[current].$2),
             Expanded(
-              child: FadeTransition(
-                opacity: CurvedAnimation(parent: _tabFade, curve: Curves.easeOut),
-                child: SlideTransition(
-                  position: Tween(
-                    begin: const Offset(0, 0.012),
-                    end: Offset.zero,
-                  ).animate(CurvedAnimation(parent: _tabFade, curve: Curves.easeOutCubic)),
-                  child: widget.shell,
-                ),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  const Positioned.fill(child: PineBackdrop()),
+                  FadeTransition(
+                    opacity: CurvedAnimation(parent: _tabFade, curve: Curves.easeOut),
+                    child: SlideTransition(
+                      position: Tween(
+                        begin: const Offset(0, 0.012),
+                        end: Offset.zero,
+                      ).animate(CurvedAnimation(parent: _tabFade, curve: Curves.easeOutCubic)),
+                      child: widget.shell,
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -582,7 +590,13 @@ class TabPage extends StatelessWidget {
         ...children,
       ],
     );
-    if (onRefresh == null) return list;
-    return RefreshIndicator(onRefresh: onRefresh!, color: C.green, child: list);
+    final body = onRefresh == null ? list : RefreshIndicator(onRefresh: onRefresh!, color: C.green, child: list);
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        const Positioned.fill(child: PineBackdrop()),
+        body,
+      ],
+    );
   }
 }

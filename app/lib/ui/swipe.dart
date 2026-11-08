@@ -5,6 +5,7 @@ import 'package:flutter/physics.dart';
 import 'package:flutter/services.dart';
 
 import '../core/theme.dart';
+import '../screens/play/pack_feedback.dart';
 
 /// A card you can throw. Right is Over, left is Under; with [onSkip] set,
 /// up skips; with [onPullDown] set, a downward pull calls it and the card
@@ -69,6 +70,7 @@ class SwipeableState extends State<Swipeable> with SingleTickerProviderStateMixi
   @override
   void initState() {
     super.initState();
+    PackFeedback.instance.preload();
     _c.addListener(() => setState(() => _pos = Offset.lerp(_from, _to, _c.value)!));
   }
 
@@ -167,6 +169,7 @@ class SwipeableState extends State<Swipeable> with SingleTickerProviderStateMixi
     if (_busy || !widget.enabled) return;
     _busy = true;
     widget.onEngage?.call();
+    PackFeedback.instance.play('swoosh');
     action == 'skip' ? HapticFeedback.lightImpact() : HapticFeedback.heavyImpact();
     final s = _size;
     final dir = switch (action) {

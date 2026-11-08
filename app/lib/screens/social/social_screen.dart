@@ -36,24 +36,45 @@ class _SocialScreenState extends State<SocialScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return RefreshIndicator(
-      onRefresh: () async {
-        setState(() => _revision++);
-      },
-      child: ListView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
-        children: [
-          const PageTitle('Social'),
-          UnderTabs(labels: const ['Friends', 'Messages', 'Leagues'], index: _tab, onChanged: (i) => setState(() => _tab = i)),
-          const SizedBox(height: 8),
-          switch (_tab) {
-            0 => _FriendsTab(key: ValueKey('friends-$_revision')),
-            1 => _MessagesTab(key: ValueKey('messages-$_revision'), onLeagues: () => setState(() => _tab = 2)),
-            _ => _LeaguesTab(key: ValueKey('leagues-$_revision')),
-          },
-        ],
-      ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Material(
+          color: C.bg,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 6),
+            child: UnderTabs(
+              labels: const ['Friends', 'Messages', 'Leagues'],
+              index: _tab,
+              onChanged: (i) => setState(() => _tab = i),
+            ),
+          ),
+        ),
+        Expanded(
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              const Positioned.fill(child: PineBackdrop()),
+              RefreshIndicator(
+                onRefresh: () async {
+                  setState(() => _revision++);
+                },
+                child: ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+                  children: [
+                    switch (_tab) {
+                      0 => _FriendsTab(key: ValueKey('friends-$_revision')),
+                      1 => _MessagesTab(key: ValueKey('messages-$_revision'), onLeagues: () => setState(() => _tab = 2)),
+                      _ => _LeaguesTab(key: ValueKey('leagues-$_revision')),
+                    },
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

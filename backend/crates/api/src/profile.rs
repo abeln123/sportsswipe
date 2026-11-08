@@ -101,19 +101,30 @@ async fn stats_json(state: &AppState, user_id: Uuid) -> ApiResult<Value> {
     .bind(ss_db::contests::week_start(ss_db::contests::today_local()))
     .fetch_optional(&state.pool)
     .await?;
-    let best: Option<(i64, i64)> = sqlx::query_as(
-        "SELECT player_id, correct_count FROM mastery_totals WHERE user_id = $1 ORDER BY correct_count DESC, first_earned_at LIMIT 1",
+    let top_rows: Vec<(i64, i64, Option<String>)> = sqlx::query_as(
+        r#"SELECT mt.player_id, mt.correct_count, ef.finish
+           FROM mastery_totals mt
+           LEFT JOIN equipped_finishes ef ON ef.user_id = mt.user_id AND ef.player_id = mt.player_id
+           WHERE mt.user_id = $1
+           ORDER BY mt.correct_count DESC, mt.first_earned_at
+           LIMIT 3"#,
     )
     .bind(user_id)
-    .fetch_optional(&state.pool)
+    .fetch_all(&state.pool)
     .await?;
-    let best_card = match best {
-        Some((pid, count)) => {
-            let specs = ss_db::cards::card_specs(&state.pool, &[pid]).await?;
-            Some(json!({ "card": specs.get(&pid), "mastery": ss_db::cards::mastery_json(count) }))
-        }
-        None => None,
-    };
+    let top_ids: Vec<i64> = top_rows.iter().map(|r| r.0).collect();
+    let top_specs = ss_db::cards::card_specs(&state.pool, &top_ids).await?;
+    let top_cards: Vec<Value> = top_rows
+        .iter()
+        .map(|(pid, count, finish)| {
+            json!({
+                "card": top_specs.get(pid),
+                "mastery": ss_db::cards::mastery_json(*count),
+                "finish": finish.clone().unwrap_or_else(|| "base".into()),
+            })
+        })
+        .collect();
+    let best_card = top_cards.first().cloned();
     Ok(json!({
         // Win rate: settled, non-void Solo entries won / graded. A parlay is one entry.
         "won": won, "lost": lost,
@@ -122,6 +133,7 @@ async fn stats_json(state: &AppState, user_id: Uuid) -> ApiResult<Value> {
         "weeklyContest": { "points": contest.map(|c| c.0).unwrap_or(0), "daysCounted": contest.map(|c| c.1).unwrap_or(0),
                            "rank": contest.map(|c| c.2), "maxPoints": 50 },
         "bestCard": best_card,
+        "topCards": top_cards,
     }))
 }
 

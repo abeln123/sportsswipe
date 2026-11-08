@@ -47,10 +47,14 @@ class _InviteScreenState extends ConsumerState<InviteScreen> {
   Widget build(BuildContext context) {
     final me = ref.watch(sessionProvider).value;
     return Scaffold(
-      body: SafeArea(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 420),
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          const Positioned.fill(child: PineBackdrop()),
+          SafeArea(
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 420),
             child: FutureBuilder(
               future: _preview,
               builder: (context, snap) {

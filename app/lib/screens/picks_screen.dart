@@ -68,47 +68,65 @@ class _PicksScreenState extends ConsumerState<PicksScreen> {
     });
     final queued = ref.watch(pickQueueProvider);
     final s = _summary;
-    return RefreshIndicator(
-      color: C.green,
-      onRefresh: () => _load(reset: true),
-      child: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
-        children: [
-          const PageTitle('My picks'),
-          UnderTabs(
-            labels: const ['Pending', 'Settled'],
-            counts: [((s?['pendingCount'] as num?)?.toInt() ?? 0) + queued.length, (s?['settledCount'] as num?)?.toInt() ?? 0],
-            index: _tab,
-            onChanged: (i) {
-              setState(() => _tab = i);
-              _load(reset: true);
-            },
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Material(
+          color: C.bg,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 6),
+            child: UnderTabs(
+              labels: const ['Pending', 'Settled'],
+              counts: [((s?['pendingCount'] as num?)?.toInt() ?? 0) + queued.length, (s?['settledCount'] as num?)?.toInt() ?? 0],
+              index: _tab,
+              onChanged: (i) {
+                setState(() => _tab = i);
+                _load(reset: true);
+              },
+            ),
           ),
-          if (_tab == 0 && s != null && (s['pendingCount'] as num) > 0) ...[
-            const SizedBox(height: 22),
-            Row(
-              children: [
-                Expanded(child: Labeled('Locked entries', '${s['pendingCount']}')),
-                Expanded(child: Labeled('Wagered', f.coins(s['wagered'] as num))),
-                Expanded(child: Labeled('Possible return', f.coins(s['possibleReturn'] as num))),
-              ],
-            ),
-          ],
-          if (_tab == 0)
-            for (final q in queued) _queuedRow(q),
-          if (_error != null) ErrorText(_error!, onRetry: () => _load(reset: true)),
-          if (_items.isEmpty && !_loading && _error == null && (_tab == 1 || queued.isEmpty))
-            EmptyState(
-              icon: Icons.receipt_long_outlined,
-              title: _tab == 0 ? 'No pending picks' : 'No settled picks yet',
-              body: _tab == 0 ? 'Submit a pick from Play to see it here.' : 'Results appear here after games end.',
-              action: PrimaryButton('Make another call', onPressed: () => context.go('/play')),
-            ),
-          for (final e in _items) _EntryRow(e),
-          if (_loading) const Loading(),
-          if (_cursor != null && !_loading) GhostButton('Load more', color: C.green, onPressed: _load),
-        ],
-      ),
+        ),
+        Expanded(
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              const Positioned.fill(child: PineBackdrop()),
+              RefreshIndicator(
+                color: C.green,
+                onRefresh: () => _load(reset: true),
+                child: ListView(
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+                  children: [
+                    if (_tab == 0 && s != null && (s['pendingCount'] as num) > 0) ...[
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          Expanded(child: Labeled('Locked entries', '${s['pendingCount']}')),
+                          Expanded(child: Labeled('Wagered', f.coins(s['wagered'] as num))),
+                          Expanded(child: Labeled('Possible return', f.coins(s['possibleReturn'] as num))),
+                        ],
+                      ),
+                    ],
+                    if (_tab == 0)
+                      for (final q in queued) _queuedRow(q),
+                    if (_error != null) ErrorText(_error!, onRetry: () => _load(reset: true)),
+                    if (_items.isEmpty && !_loading && _error == null && (_tab == 1 || queued.isEmpty))
+                      EmptyState(
+                        icon: Icons.receipt_long_outlined,
+                        title: _tab == 0 ? 'No pending picks' : 'No settled picks yet',
+                        body: _tab == 0 ? 'Submit a pick from Play to see it here.' : 'Results appear here after games end.',
+                        action: PrimaryButton('Make another call', onPressed: () => context.go('/play')),
+                      ),
+                    for (final e in _items) _EntryRow(e),
+                    if (_loading) const Loading(),
+                    if (_cursor != null && !_loading) GhostButton('Load more', color: C.green, onPressed: _load),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 

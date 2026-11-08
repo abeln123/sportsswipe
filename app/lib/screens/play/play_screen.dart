@@ -191,38 +191,3 @@ class _SportFilter extends StatelessWidget {
     ],
   );
 }
-
-/// Deep pine surface with two oversized diagonal cuts at the upper right.
-/// It never moves, so cards change while the room stays put.
-class PineBackdrop extends StatelessWidget {
-  const PineBackdrop({super.key});
-
-  @override
-  Widget build(BuildContext context) => const RepaintBoundary(child: CustomPaint(painter: _PinePainter()));
-}
-
-class _PinePainter extends CustomPainter {
-  const _PinePainter();
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    canvas.save();
-    canvas.clipRect(Offset.zero & size);
-    final w = size.width, h = size.height;
-    canvas.drawRect(Offset.zero & size, Paint()..color = const Color(0xFF0A1C17));
-    void cut(Offset anchor, double thickness, Color color) {
-      canvas.save();
-      canvas.translate(anchor.dx, anchor.dy);
-      canvas.rotate(-0.62);
-      canvas.drawRect(Rect.fromLTWH(-w * 1.6, -thickness / 2, w * 3.2, thickness), Paint()..color = color);
-      canvas.restore();
-    }
-
-    cut(Offset(w * 1.02, h * 0.10), w * 0.52, const Color(0xFF0F2820));
-    cut(Offset(w * 1.18, h * 0.44), w * 0.30, const Color(0xFF0D241D));
-    canvas.restore();
-  }
-
-  @override
-  bool shouldRepaint(_PinePainter old) => false;
-}

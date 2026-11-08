@@ -98,139 +98,217 @@ class _AiScreenState extends ConsumerState<AiScreen> {
   Widget build(BuildContext context) {
     ref.listen(researchRequestProvider, (_, r) => _consume(r));
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(20, 14, 8, 6),
-          child: Row(
-            children: [
-              const Expanded(
-                child: Text('Analyst', style: T.h1),
-              ),
-              PopupMenuButton<String>(
+        Material(
+          color: C.bg,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 6),
+            child: UnderTabs(
+              labels: const ['Analyst'],
+              index: 0,
+              onChanged: (_) {},
+              trailing: PopupMenuButton<String>(
                 tooltip: 'Conversation menu',
                 enabled: !_busy,
+                padding: EdgeInsets.zero,
                 onSelected: (_) {
                   setState(_turns.clear);
                   _persist();
                 },
                 itemBuilder: (_) => [const PopupMenuItem(value: 'clear', child: Text('Clear conversation'))],
-                icon: const Icon(Icons.more_horiz, color: C.dim),
+                icon: const Icon(Icons.more_horiz, color: C.dim, size: 20),
               ),
-            ],
+            ),
           ),
         ),
         Expanded(
-          child: ListView(
-            controller: _scroll,
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+          child: Stack(
+            fit: StackFit.expand,
             children: [
-              if (_turns.isEmpty) ...[
-                const Text(
-                  'Start with a player.\nFollow the numbers.',
-                  style: T.h2,
-                ),
-                const SizedBox(height: 22),
-                const Text('FROM THE SLATE', style: T.label),
-                const SizedBox(height: 8),
-                FutureBuilder(
-                  future: _suggestions,
-                  builder: (context, snap) {
-                    if (snap.hasError) {
-                      return ErrorText(
-                        snap.error!,
-                        onRetry: () => setState(() {
-                          _suggestions = api.get('/analyst/suggestions');
-                        }),
-                      );
-                    }
-                    if (!snap.hasData) return const SizedBox(height: 280, child: Loading());
-                    final questions = (snap.data!['suggestions'] as List).cast<Map<String, dynamic>>();
-                    if (questions.isEmpty) {
-                      return const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 16),
-                        child: Text('No open player lines right now. You can still ask about recent games below.', style: T.dim),
-                      );
-                    }
-                    return Column(
+              const Positioned.fill(child: PineBackdrop()),
+              ListView(
+                controller: _scroll,
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+                children: [
+                  if (_turns.isEmpty) ...[
+                    Row(
                       children: [
-                        for (final x in questions.take(2))
-                          InkWell(
-                            onTap: () => _ask(x['label'] as String, form: {'playerId': x['playerId'], 'statKey': x['statKey'], 'n': 5}),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(vertical: 18),
-                              decoration: const BoxDecoration(
-                                border: Border(bottom: BorderSide(color: C.line)),
-                              ),
-                              child: Row(
-                                children: [
-                                  if (x['card'] != null) ...[
-                                    JerseyIcon(spec: CardSpec.fromJson((x['card'] as Map).cast<String, dynamic>()), size: 52),
-                                    const SizedBox(width: 14),
-                                  ],
-                                  Expanded(child: Text(x['label'] as String, style: T.h3)),
-                                  const SizedBox(width: 8),
-                                  const Icon(Icons.north_east, size: 18, color: C.green),
-                                ],
-                              ),
-                            ),
-                          ),
-                      ],
-                    );
-                  },
-                ),
-              ],
-              for (final (i, t) in _turns.indexed) ...[
-                Padding(
-                  padding: const EdgeInsets.only(top: 12, bottom: 22),
-                  child: Text(t['q'] as String, style: T.h3.copyWith(color: C.dim)),
-                ),
-                if (t['a'] != null)
-                  _Answer((t['a'] as Map).cast<String, dynamic>(), key: ValueKey(i))
-                else
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 18),
-                    child: Row(
-                      children: [
-                        SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 1.5, color: C.green)),
-                        SizedBox(width: 12),
-                        Text('Reading the game log…', style: T.small),
+                        Container(
+                          width: 8,
+                          height: 8,
+                          decoration: const BoxDecoration(color: C.green, shape: BoxShape.circle),
+                        ),
+                        const SizedBox(width: 8),
+                        Text('LIVE STAT BREAKDOWNS', style: T.label.copyWith(color: C.green)),
                       ],
                     ),
-                  ),
-                const SizedBox(height: 24),
-                const Divider(color: C.line),
-              ],
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Start with a player.\nFollow the numbers.',
+                      style: T.h1,
+                    ),
+                    const SizedBox(height: 22),
+                    const Text('FROM THE SLATE', style: T.label),
+                    const SizedBox(height: 10),
+                    FutureBuilder(
+                      future: _suggestions,
+                      builder: (context, snap) {
+                        if (snap.hasError) {
+                          return ErrorText(
+                            snap.error!,
+                            onRetry: () => setState(() {
+                              _suggestions = api.get('/analyst/suggestions');
+                            }),
+                          );
+                        }
+                        if (!snap.hasData) return const SizedBox(height: 280, child: Loading());
+                        final questions = (snap.data!['suggestions'] as List).cast<Map<String, dynamic>>();
+                        if (questions.isEmpty) {
+                          return const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 16),
+                            child: Text('No open player lines right now. Ask about recent games below.', style: T.dim),
+                          );
+                        }
+                        return Column(
+                          children: [
+                            for (final x in questions)
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 10),
+                                child: InkWell(
+                                  borderRadius: BorderRadius.circular(10),
+                                  onTap: () => _ask(x['label'] as String, form: {'playerId': x['playerId'], 'statKey': x['statKey'], 'n': 5}),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF0E241E),
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(color: C.line),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        if (x['card'] != null) ...[
+                                          JerseyIcon(spec: CardSpec.fromJson((x['card'] as Map).cast<String, dynamic>()), size: 50),
+                                          const SizedBox(width: 14),
+                                        ],
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              if (x['card'] != null)
+                                                Padding(
+                                                  padding: const EdgeInsets.only(bottom: 3),
+                                                  child: Text(
+                                                    '${(x['card'] as Map)['teamAbbr']} · ${((x['card'] as Map)['league'] as String).toUpperCase()}',
+                                                    style: T.label.copyWith(color: C.green, fontSize: 10.5),
+                                                  ),
+                                                ),
+                                              Text(x['label'] as String, style: T.h3),
+                                            ],
+                                          ),
+                                        ),
+                                        const SizedBox(width: 10),
+                                        Container(
+                                          width: 32,
+                                          height: 32,
+                                          decoration: BoxDecoration(
+                                            color: C.green.withValues(alpha: 0.14),
+                                            borderRadius: BorderRadius.circular(6),
+                                            border: Border.all(color: C.green.withValues(alpha: 0.4)),
+                                          ),
+                                          child: const Icon(Icons.north_east, size: 16, color: C.green),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        );
+                      },
+                    ),
+                  ],
+                  for (final (i, t) in _turns.indexed) ...[
+                    Container(
+                      margin: const EdgeInsets.only(top: 6, bottom: 14),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF122C24),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border(left: const BorderSide(color: C.green, width: 3)),
+                      ),
+                      child: Text(t['q'] as String, style: T.h3.copyWith(color: C.text)),
+                    ),
+                    if (t['a'] != null)
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF0E241E),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: C.line),
+                        ),
+                        child: _Answer((t['a'] as Map).cast<String, dynamic>(), key: ValueKey(i)),
+                      )
+                    else
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 18),
+                        child: Row(
+                          children: [
+                            SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 1.5, color: C.green)),
+                            SizedBox(width: 12),
+                            Text('Reading the game log…', style: T.small),
+                          ],
+                        ),
+                      ),
+                    const SizedBox(height: 20),
+                  ],
+                ],
+              ),
             ],
           ),
         ),
         Container(
-          padding: const EdgeInsets.fromLTRB(20, 10, 12, 12),
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
           decoration: const BoxDecoration(
-            color: C.surface,
+            color: C.bg,
             border: Border(top: BorderSide(color: C.line)),
           ),
-          child: Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _q,
-                  maxLength: 300,
-                  textInputAction: TextInputAction.send,
-                  decoration: const InputDecoration(
-                    hintText: 'Ask a follow-up…',
-                    counterText: '',
-                    border: InputBorder.none,
-                    enabledBorder: InputBorder.none,
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(14, 2, 6, 2),
+            decoration: BoxDecoration(
+              color: const Color(0xFF0E241E),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: C.line),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _q,
+                    maxLength: 300,
+                    textInputAction: TextInputAction.send,
+                    decoration: const InputDecoration(
+                      hintText: 'Ask about any player or stat…',
+                      counterText: '',
+                      border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                    ),
+                    onSubmitted: _ask,
                   ),
-                  onSubmitted: _ask,
                 ),
-              ),
-              IconButton(
-                onPressed: _busy ? null : () => _ask(_q.text),
-                tooltip: 'Ask analyst',
-                icon: Icon(Icons.arrow_upward, color: _busy ? C.dim : C.green),
-              ),
-            ],
+                IconButton(
+                  onPressed: _busy ? null : () => _ask(_q.text),
+                  tooltip: 'Ask analyst',
+                  style: IconButton.styleFrom(
+                    backgroundColor: _busy ? C.disabled : C.green,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                    minimumSize: const Size(36, 36),
+                  ),
+                  icon: Icon(Icons.arrow_upward, size: 18, color: _busy ? C.dim : const Color(0xFF0D2416)),
+                ),
+              ],
+            ),
           ),
         ),
       ],

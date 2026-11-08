@@ -38,48 +38,54 @@ class _HeadToHeadInviteState extends ConsumerState<HeadToHeadInviteScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    body: SafeArea(
-      child: FutureBuilder(
-        future: _data,
-        builder: (context, snap) {
-          if (snap.hasError) return ErrorText(snap.error!);
-          if (!snap.hasData) return const Loading();
-          final d = snap.data!;
-          final me = ref.watch(sessionProvider).value;
-          return ListView(
-            padding: const EdgeInsets.all(24),
-            children: [
-              const Text('SPORTS SWIPE · HEAD-TO-HEAD', style: T.label),
-              const SizedBox(height: 18),
-              Text('${d['creatorName']} challenged you.', style: T.h1),
-              const SizedBox(height: 20),
-              Center(
-                child: SportCard(
-                  spec: CardSpec.fromJson((d['card'] as Map).cast<String, dynamic>()),
-                  variant: CardVariant.tile,
-                  width: 230,
-                ),
-              ),
-              const SizedBox(height: 20),
-              Text('Picks lock ${f.dayTime(DateTime.parse(d['lockAt'] as String))}', style: T.small),
-              const SizedBox(height: 16),
-              if (d['open'] != true)
-                const Text('This challenge has locked. Ask for a fresh invite.', style: T.dim)
-              else if (me == null)
-                PrimaryButton(
-                  'Sign up or sign in to play',
-                  onPressed: () => context.go('/login?next=${Uri.encodeComponent('/duel/${widget.token}')}'),
-                )
-              else ...[
-                Text('Playing as ${me.displayName}', style: T.small),
-                const SizedBox(height: 10),
-                PrimaryButton('Accept 1v1 & connect as friends', busy: _busy, onPressed: _accept),
-              ],
-              if (_error != null) Text(_error!, style: const TextStyle(color: C.danger)),
-            ],
-          );
-        },
-      ),
+    body: Stack(
+      fit: StackFit.expand,
+      children: [
+        const Positioned.fill(child: PineBackdrop()),
+        SafeArea(
+          child: FutureBuilder(
+            future: _data,
+            builder: (context, snap) {
+              if (snap.hasError) return ErrorText(snap.error!);
+              if (!snap.hasData) return const Loading();
+              final d = snap.data!;
+              final me = ref.watch(sessionProvider).value;
+              return ListView(
+                padding: const EdgeInsets.all(24),
+                children: [
+                  const Text('SPORTS SWIPE · HEAD-TO-HEAD', style: T.label),
+                  const SizedBox(height: 18),
+                  Text('${d['creatorName']} challenged you.', style: T.h1),
+                  const SizedBox(height: 20),
+                  Center(
+                    child: SportCard(
+                      spec: CardSpec.fromJson((d['card'] as Map).cast<String, dynamic>()),
+                      variant: CardVariant.tile,
+                      width: 230,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Text('Picks lock ${f.dayTime(DateTime.parse(d['lockAt'] as String))}', style: T.small),
+                  const SizedBox(height: 16),
+                  if (d['open'] != true)
+                    const Text('This challenge has locked. Ask for a fresh invite.', style: T.dim)
+                  else if (me == null)
+                    PrimaryButton(
+                      'Sign up or sign in to play',
+                      onPressed: () => context.go('/login?next=${Uri.encodeComponent('/duel/${widget.token}')}'),
+                    )
+                  else ...[
+                    Text('Playing as ${me.displayName}', style: T.small),
+                    const SizedBox(height: 10),
+                    PrimaryButton('Accept 1v1 & connect as friends', busy: _busy, onPressed: _accept),
+                  ],
+                  if (_error != null) Text(_error!, style: const TextStyle(color: C.danger)),
+                ],
+              );
+            },
+          ),
+        ),
+      ],
     ),
   );
 }

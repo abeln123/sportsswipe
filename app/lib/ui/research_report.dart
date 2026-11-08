@@ -81,7 +81,7 @@ class _ResearchReportState extends State<ResearchReport> {
                 : requestedLine != null && requestedLine != currentLine
                 ? 'Requested line'
                 : "Today’s line"} · ${f.line(line)}',
-            style: T.small,
+            style: T.small.copyWith(color: C.green, fontWeight: FontWeight.w700),
           ),
         const SizedBox(height: 10),
         SizedBox(
@@ -98,7 +98,7 @@ class _ResearchReportState extends State<ResearchReport> {
                         left: 0,
                         right: 0,
                         bottom: labelHeight + 6 + 116 * line / maxV,
-                        child: Container(height: 1, color: C.dim.withValues(alpha: .65)),
+                        child: Container(height: 1.5, color: C.green.withValues(alpha: .55)),
                       ),
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.end,
@@ -119,9 +119,12 @@ class _ResearchReportState extends State<ResearchReport> {
                                     const SizedBox(height: 5),
                                     Container(
                                       width: 30,
-                                      height: math.max(2, 116 * values[i] / maxV),
+                                      height: math.max(4, 116 * values[i] / maxV),
                                       decoration: BoxDecoration(
-                                        color: focusLine && values[i] > line ? C.green : const Color(0xFFACC0B7),
+                                        borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
+                                        color: (line != null ? values[i] >= line : values[i] >= average)
+                                            ? C.green
+                                            : const Color(0xFF285E4B),
                                         border: _selected == i ? Border.all(color: C.text, width: 2) : null,
                                       ),
                                     ),

@@ -15,11 +15,17 @@ class PackFeedback {
     final prefs = await SharedPreferences.getInstance();
     sound = prefs.getBool('pack.sound') ?? true;
     haptics = prefs.getBool('pack.haptics') ?? true;
-    for (final cue in ['grip', 'tear', 'brush', 'square']) {
+    for (final cue in ['grip', 'tear', 'brush', 'square', 'swoosh']) {
       try {
         final player = AudioPlayer();
         await player.setReleaseMode(ReleaseMode.stop);
-        await player.setVolume(cue == 'brush' ? .25 : .45);
+        await player.setVolume(
+          switch (cue) {
+            'brush' => .25,
+            'swoosh' => .32,
+            _ => .45,
+          },
+        );
         await player.setSourceAsset('audio/$cue.wav');
         _players[cue] = player;
       } catch (_) {
