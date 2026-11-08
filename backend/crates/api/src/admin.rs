@@ -5,7 +5,10 @@ use crate::auth::AdminUser;
 use crate::error::{ApiError, ApiResult};
 use crate::state::AppState;
 use axum::{
-    extract::{Query, State},
+    body::Bytes,
+    extract::{Path, Query, State},
+    http::{HeaderMap, Method},
+    response::Response,
     routing::{get, post},
     Json, Router,
 };
@@ -128,19 +131,7 @@ async fn lock_market(State(state): State<AppState>, _: AdminUser, Json(b): Json<
     Ok(Json(json!({ "locked": true })))
 }
 
-async fn reset_presentation(State(state): State<AppState>, AdminUser(admin): AdminUser) -> ApiResult<Json<Value>> {
-    let mut tx = state.pool.begin().await?;
-    sqlx::query(
-        "DELETE FROM collectible_sales WHERE collectible_id IN (SELECT id FROM diamond_collectibles WHERE earner_id = $1 AND qualification_source = 'admin_presentation')",
-    )
-    .bind(admin.id)
-    .execute(&mut *tx)
-    .await?;
-    sqlx::query("DELETE FROM diamond_collectibles WHERE earner_id = $1 AND qualification_source = 'admin_presentation'")
-        .bind(admin.id)
-        .execute(&mut *tx)
-        .await?;
-    tx.commit().await?;
-    Ok(Json(json!({ "reset": true })))
+async fn reset_presentation(State(state): State<AppState>, _: AdminUser, headers: HeaderMap, body: Bytes) -> ApiResult<Response> {
+    // Compatibility route shares the on-chain reset; never delete provenance.
+    crate::collectibles::proxy(State(state),Path("presentation/reset".to_string()),Method::POST,headers,body).await
 }
-

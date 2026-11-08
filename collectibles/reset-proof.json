@@ -1,0 +1,11 @@
+{
+  "network": "devnet",
+  "asset": "4PbnWU42HGk3wYp2UW11KJYPwKbhFsGbb4oyfw3ningY",
+  "edition": "3",
+  "originalSale": "https://explorer.solana.com/tx/5FhLdBD3sMWCQAVmoXNdokYQx4CZcSYcn73tDKZZXbJ9hBNmHyFq7XtZqQ7d6U7YA7dchLwnvjLHczJJYbQtdKFg?cluster=devnet",
+  "firstReset": "https://explorer.solana.com/tx/17XWfbKk68fjqoCFHadFxXeAHybPMXVqrcPePhAAecxRcNw3ukx3KUSHmzXyW5CVGzipGKM7eh1h5VBmCBFVprB?cluster=devnet",
+  "repeatSale": "https://explorer.solana.com/tx/3XYgtnVVc6DuuV3LSiesxpaeZbmRVr6SzhzjRMqPCxYJ9oFzm2Dni6tsH4Hn9siK69zSX5QwoZ9d4d2ogXBVU8uH?cluster=devnet",
+  "secondReset": "https://explorer.solana.com/tx/3UtkBRsDBUFDF5JByxN2n1sTwbX6w3Wte5WxtVTXyCTrD882VMBvqcAeKD7HCJur9bLpFNJP6zmQUsitRvmANnTy?cluster=devnet",
+  "retainedMastery": 400,
+  "sameAssetReused": true
+}

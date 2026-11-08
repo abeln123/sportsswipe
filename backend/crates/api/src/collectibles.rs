@@ -17,7 +17,7 @@ use axum::{
 pub fn routes() -> Router<AppState> {
     Router::new().route("/collectibles/{*path}", any(proxy))
 }
-async fn proxy(
+pub(crate) async fn proxy(
     State(state): State<AppState>,
     Path(path): Path<String>,
     method: Method,

@@ -10,6 +10,7 @@ import { createSignerFromKeypair, signerIdentity, publicKey, createNoopSigner } 
 import { create, transfer, fetchAsset, mplCore } from '@metaplex-foundation/mpl-core';
 import { toWeb3JsInstruction } from '@metaplex-foundation/umi-web3js-adapters';
 import { address, price, mergeTransaction, DEVNET_GENESIS, eligibleSql } from './policy.mjs';
+import {presentationResetService} from './presentation-reset.mjs';
 
 const secret=process.env.COLLECTIBLES_SERVICE_KEY;
 if(!secret || secret.length<32)throw new Error('Set COLLECTIBLES_SERVICE_KEY to a random secret of at least 32 characters.');
@@ -40,6 +41,14 @@ async function reconcileSale(s){
   await pool.query("UPDATE collectible_sales SET status='expired' WHERE id=$1 AND status IN ('signing','submitted')",[s.id]);
  }
 }
+async function isAdmin(user){return (await pool.query('SELECT is_admin FROM users WHERE id=$1',[user])).rows[0]?.is_admin===true;}
+function presentationBuyerKey(){
+ const raw=process.env.PRESENTATION_BUYER_KEYPAIR_JSON;
+ const path=process.env.PRESENTATION_BUYER_KEYPAIR;
+ if(!raw&&!path)fail('The presentation buyer is not configured.');
+ return Keypair.fromSecretKey(Uint8Array.from(JSON.parse(raw||readFileSync(path,'utf8'))));
+}
+const resets=presentationResetService({pool,chain,umi,assetAt,wallet,buyerKey:presentationBuyerKey,fail,explorer});
 async function dispatch(path,method,b,user){
  if(path==='demo/settle' && method==='POST') {
   const local = ['localhost','127.0.0.1'].includes(new URL(process.env.DATABASE_URL).hostname);
@@ -75,7 +84,7 @@ async function dispatch(path,method,b,user){
     await db.query('INSERT INTO collectible_wallets(user_id,address,verified) VALUES ($1,$2,true) ON CONFLICT(user_id) DO NOTHING',[id,buyerAddress]);return id;
    });
   }
-  const history=(await pool.query("SELECT * FROM collectible_sales WHERE collectible_id=$1 AND seller_id=$2 AND status IN ('listed','signing','submitted','confirmed') ORDER BY created_at DESC LIMIT 1",[c.id,user])).rows[0];
+  const history=(await pool.query("SELECT * FROM collectible_sales WHERE collectible_id=$1 AND seller_id=$2 AND status IN ('listed','signing','submitted','confirmed') AND NOT EXISTS(SELECT 1 FROM presentation_sale_resets r WHERE r.sale_id=collectible_sales.id AND r.status='confirmed') ORDER BY created_at DESC LIMIT 1",[c.id,user])).rows[0];
   if(history?.status==='confirmed')return {id:history.id,status:'confirmed'};
   let listing=history;
   if(!listing)listing=await dispatch('list','POST',{id:c.id,price:'0.1'},user);
@@ -89,14 +98,8 @@ async function dispatch(path,method,b,user){
   }
   return {id:sale.id,status:sale.status,buyer:buyerAddress,lamports:sale.lamports};
  }
- if(path==='presentation/reset' && method==='POST'){
-  if(!await isAdmin(user))fail('Admin access required.',403);
-  await tx(async db=>{
-   await db.query("DELETE FROM collectible_sales WHERE collectible_id IN (SELECT id FROM diamond_collectibles WHERE earner_id=$1 AND qualification_source='admin_presentation')",[user]);
-   await db.query("DELETE FROM diamond_collectibles WHERE earner_id=$1 AND qualification_source='admin_presentation'",[user]);
-  });
-  return {reset:true};
- }
+ if(path==='presentation/reset' && method==='POST')return resets.prepare(user,b);
+ if(path==='presentation/reset/sign' && method==='POST')return resets.sign(user,b);
  if(path==='handoff' && method==='POST'){
   const ticket=randomBytes(32).toString('hex');await pool.query("INSERT INTO collectible_sessions VALUES ($1,$2,'handoff',now()+interval '2 minutes')",[hash(ticket),user]);
   return {url:`${base.origin}/collectibles/index.html#${ticket}`};
@@ -120,6 +123,7 @@ async function dispatch(path,method,b,user){
   await db.query('UPDATE collectible_wallets SET verified=true,challenge=NULL WHERE user_id=$1',[user]);return {address:w.address};
  });
  if(path==='dashboard' && method==='GET'){
+  const presentationResets=await resets.dashboard(user);
   const pending=await pool.query("SELECT * FROM collectible_sales WHERE status IN ('signing','submitted')");
   for(const s of pending.rows)await reconcileSale(s);
   const owned=(await pool.query('SELECT address FROM collectible_wallets WHERE user_id=$1 AND verified',[user])).rows[0]?.address;
@@ -134,8 +138,8 @@ async function dispatch(path,method,b,user){
    const ownerProfile=owner?(await pool.query('SELECT p.display_name FROM collectible_wallets w JOIN profiles p ON p.user_id=w.user_id WHERE w.address=$1 AND w.verified',[owner])).rows[0]?.display_name:null;
    out.push({...c,owner,owner_name:ownerProfile??null,is_owner:!!owned&&owner===owned,is_earner:c.earner_id===user,asset_url:c.asset_address?explorer('address',c.asset_address):null});
   }
-  const sales=(await pool.query('SELECT * FROM collectible_sales ORDER BY created_at DESC LIMIT 200')).rows.map(s=>({...s,transaction_bytes:undefined,transaction_url:s.signature?explorer('tx',s.signature):null,is_seller:s.seller_id===user,is_buyer:s.buyer_id===user}));
-  return {demo_controls:process.env.ENABLE_DIAMOND_DEMO==='true'&&['localhost','127.0.0.1'].includes(new URL(process.env.DATABASE_URL).hostname),network:'devnet',wallet:owned??null,issuer:issuer.publicKey.toBase58(),cards:cards.rows,collectibles:out,sales};
+  const sales=(await pool.query("SELECT * FROM collectible_sales WHERE NOT EXISTS(SELECT 1 FROM presentation_sale_resets r WHERE r.sale_id=collectible_sales.id AND r.status='confirmed') ORDER BY created_at DESC LIMIT 200")).rows.map(s=>({...s,transaction_bytes:undefined,transaction_url:s.signature?explorer('tx',s.signature):null,is_seller:s.seller_id===user,is_buyer:s.buyer_id===user}));
+  return {demo_controls:process.env.ENABLE_DIAMOND_DEMO==='true'&&['localhost','127.0.0.1'].includes(new URL(process.env.DATABASE_URL).hostname),network:'devnet',wallet:owned??null,issuer:issuer.publicKey.toBase58(),cards:cards.rows,collectibles:out,sales,presentationResets};
  }
  if(path==='claim' && method==='POST'){
   const owner=await wallet(user);

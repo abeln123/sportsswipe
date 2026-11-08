@@ -155,3 +155,15 @@ The root app image also includes the private Node service. With
 Set the service secret and issuer/buyer key JSON secrets on that API process;
 workers do not start a chain service. Existing deployments can therefore use one
 image without exposing an additional public port. The service remains optional.
+
+Presentation resets now reverse the rehearsal sale on devnet: the seller approves
+refunding the test-SOL payment while the dedicated buyer signs returning the same
+Core asset. Both instructions execute atomically. Original sales, collectible IDs,
+metadata, edition numbers, and mastery are preserved. Confirmed resets are recorded
+in `presentation_sale_resets`; the active sell screen then offers the same edition
+for another sale. Reset retries reuse the pending transaction until it confirms or
+expires. Both reset routes require admin access; ordinary trades cannot be reset.
+
+`test/presentation-reset-live.mjs` exercises reset → resale → reset against the
+isolated local database using the dedicated rehearsal wallets and real devnet
+transactions. `reset-proof.json` records the verified Explorer receipts.

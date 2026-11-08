@@ -20,7 +20,7 @@ class SellCollectibleScreen extends StatefulWidget {
 }
 
 class _SellCollectibleState extends State<SellCollectibleScreen> {
-  Map<String, dynamic>? _dashboard, _card, _edition, _sale;
+  Map<String, dynamic>? _dashboard, _card, _edition, _sale, _resetState;
   bool _busy = false, _loading = false;
   String? _error;
   String _phase = 'Ready to connect your devnet wallet.';
@@ -71,14 +71,23 @@ class _SellCollectibleState extends State<SellCollectibleScreen> {
                 .cast<Map<String, dynamic>>()
                 .where((s) => s['collectible_id'] == edition['id'] && s['is_seller'] == true)
                 .firstOrNull;
+      final reset = ((d['presentationResets'] as List?) ?? const [])
+          .cast<Map<String, dynamic>>()
+          .where((r) => r['collectible_id'] == edition?['id'])
+          .firstOrNull;
       setState(() {
         _dashboard = d;
         _card = c;
         _edition = edition;
         _sale = sale;
+        _resetState = reset;
         _error = null;
       });
-      if (sale?['status'] == 'confirmed') {
+      if (reset?['status'] == 'confirmed' && sale == null) {
+        _step('Demo ready again. Diamond returned to your wallet; test SOL refunded to the buyer.');
+      } else if (reset?['status'] == 'submitted') {
+        _step('Reset submitted. Waiting for Solana confirmation…');
+      } else if (sale?['status'] == 'confirmed') {
         _step('Confirmed on Solana devnet. Ownership transferred. Your mastery remains 400/400.');
       } else if (sale?['status'] == 'submitted') {
         _step('Transaction submitted. Waiting for Solana confirmation…');
@@ -162,15 +171,29 @@ class _SellCollectibleState extends State<SellCollectibleScreen> {
       _error = null;
     });
     try {
-      try {
-        await api.post('/collectibles/presentation/reset', {});
-      } catch (_) {
-        await api.post('/admin/reset-presentation', {});
+      if (_connected == null) await _connect();
+      final id = _edition?['id'];
+      if (id == null) throw Exception('Refresh the card before resetting this sale.');
+      _step('Preparing demo reset: return the Diamond and refund the test-SOL payment.');
+      var reset = await api.post('/collectibles/presentation/reset', {'id': id});
+      if (reset['status'] == 'signing') {
+        _step('Approve the reset in your wallet: refund 0.1 devnet SOL and receive your Diamond.');
+        final signed = await signCollectibleTransaction(reset['transaction'] as String);
+        reset = await api.post('/collectibles/presentation/reset/sign', {'id': reset['id'], 'transaction': signed});
       }
+      for (var attempt = 0; attempt < 4 && mounted && reset['status'] == 'submitted'; attempt++) {
+        _step('Reset submitted. Waiting for Solana confirmation…');
+        await Future<void>.delayed(const Duration(seconds: 1));
+        reset = await api.post('/collectibles/presentation/reset', {'id': id});
+      }
+      if (!mounted) return;
       _steps.clear();
-      _edition = null;
-      _sale = null;
       await _refresh();
+      _step(
+        reset['reset'] == true
+            ? 'Demo ready again. Diamond returned to your wallet; test SOL refunded to the buyer.'
+            : 'Reset submitted. Waiting for Solana confirmation…',
+      );
     } catch (e) {
       if (mounted) setState(() => _error = e.toString());
     } finally {
@@ -231,6 +254,12 @@ class _SellCollectibleState extends State<SellCollectibleScreen> {
             icon: const Icon(Icons.open_in_new, size: 16),
             label: const Text('Verify transaction on Solana Explorer'),
           ),
+        if (_resetState?['transaction_url'] != null)
+          TextButton.icon(
+            onPressed: () => launchUrl(Uri.parse(_resetState!['transaction_url'] as String)),
+            icon: const Icon(Icons.open_in_new, size: 16),
+            label: const Text('Verify demo reset on Solana Explorer'),
+          ),
         if (!widget.presentation && !sold)
           TextField(
             controller: _price,
@@ -258,6 +287,10 @@ class _SellCollectibleState extends State<SellCollectibleScreen> {
         if (widget.presentation && (_edition != null || _sale != null)) ...[
           const SizedBox(height: 10),
           GhostButton('Reset demo sale', onPressed: _busy ? null : _reset),
+          const Text(
+            'Returns the card and refunds 0.1 test SOL to the demo buyer. Your mastery and original transaction remain recorded.',
+            style: T.small,
+          ),
         ],
         TextButton(onPressed: _busy ? null : _refresh, child: const Text('Refresh confirmed ownership')),
         if (_dashboard == null && _error == null) const LinearProgressIndicator(),
