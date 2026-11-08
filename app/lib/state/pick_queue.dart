@@ -145,6 +145,23 @@ class PickQueue extends Notifier<List<PendingIntent>> {
     }
   }
 
+  /// Sends everything still on the device and waits for the server to answer.
+  /// Returns false if picks are still unconfirmed when [timeout] runs out.
+  Future<bool> drain({Duration timeout = const Duration(seconds: 20)}) async {
+    flush();
+    for (final i in [...state]) {
+      if (i.state == 'checking' && !_inFlight.contains(i.commandId)) {
+        _timers.remove(i.commandId)?.cancel();
+        _send(i, attempt: 1);
+      }
+    }
+    final end = DateTime.now().add(timeout);
+    while (state.isNotEmpty && DateTime.now().isBefore(end)) {
+      await Future<void>.delayed(const Duration(milliseconds: 250));
+    }
+    return state.isEmpty;
+  }
+
   void _update() {
     state = [...state];
     _persist();

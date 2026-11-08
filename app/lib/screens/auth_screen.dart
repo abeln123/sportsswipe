@@ -6,6 +6,8 @@ import '../core/theme.dart';
 import '../state/session.dart';
 import '../ui/widgets.dart';
 
+enum _Mode { quick, signup, login }
+
 class AuthScreen extends ConsumerStatefulWidget {
   const AuthScreen({super.key, this.next});
   final String? next;
@@ -15,7 +17,7 @@ class AuthScreen extends ConsumerStatefulWidget {
 }
 
 class _AuthScreenState extends ConsumerState<AuthScreen> {
-  bool _signup = true;
+  _Mode _mode = _Mode.quick;
   bool _busy = false;
   String? _error;
   final _email = TextEditingController();
@@ -24,6 +26,11 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
 
   bool get _fromInvite => widget.next?.startsWith('/invite/') == true;
 
+  void _switch(_Mode m) => setState(() {
+        _mode = m;
+        _error = null;
+      });
+
   Future<void> _submit() async {
     setState(() {
       _busy = true;
@@ -31,10 +38,13 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     });
     try {
       final n = ref.read(sessionProvider.notifier);
-      if (_signup) {
-        await n.signup(_email.text.trim(), _password.text, _name.text.trim());
-      } else {
-        await n.login(_email.text.trim(), _password.text);
+      switch (_mode) {
+        case _Mode.quick:
+          await n.quick(_name.text.trim(), _email.text.trim());
+        case _Mode.signup:
+          await n.signup(_email.text.trim(), _password.text, _name.text.trim());
+        case _Mode.login:
+          await n.login(_email.text.trim(), _password.text);
       }
     } on ApiException catch (e) {
       setState(() => _error = e.message);
@@ -45,6 +55,19 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final (title, intro, action) = switch (_mode) {
+      _Mode.quick => (
+          'Try Sports Swipe',
+          'Swipe Over or Under on real NFL and NBA player lines. You start with 1,000 free coins.',
+          'Start swiping',
+        ),
+      _Mode.signup => (
+          'Create your account',
+          'Make calls on NFL and NBA player lines. New accounts start with 1,000 free coins.',
+          'Create account',
+        ),
+      _Mode.login => ('Welcome back', 'Log in to see your picks and coins.', 'Log in'),
+    };
     return Scaffold(
       body: SafeArea(
         child: Center(
@@ -60,40 +83,37 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                   const Text('Sports Swipe', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800)),
                 ]),
                 const SizedBox(height: 28),
-                Text(_signup ? 'Create your account' : 'Welcome back', style: T.h1),
+                Text(title, style: T.h1),
                 const SizedBox(height: 8),
-                Text(
-                  _fromInvite
-                      ? 'Sign up or log in to accept your league invite.'
-                      : _signup
-                          ? 'Make calls on NFL and NBA player lines. New accounts start with 1,000 free coins.'
-                          : 'Log in to see your picks and coins.',
-                  style: T.dim,
-                ),
+                Text(_fromInvite ? 'Sign up or log in to accept your league invite.' : intro, style: T.dim),
                 const SizedBox(height: 22),
                 AutofillGroup(
                   child: Column(children: [
-                    if (_signup)
+                    if (_mode != _Mode.login)
                       TextField(
                         controller: _name,
-                        decoration: const InputDecoration(labelText: 'Display name'),
+                        decoration: InputDecoration(labelText: _mode == _Mode.quick ? 'Your name' : 'Display name'),
                         autofillHints: const [AutofillHints.name],
-                        textInputAction: TextInputAction.next,
+                        textCapitalization: TextCapitalization.words,
+                        textInputAction: _mode == _Mode.quick ? TextInputAction.go : TextInputAction.next,
+                        onSubmitted: _mode == _Mode.quick ? (_) => _submit() : null,
                       ),
                     TextField(
                       controller: _email,
-                      decoration: const InputDecoration(labelText: 'Email'),
+                      decoration: InputDecoration(labelText: _mode == _Mode.quick ? 'Email (optional)' : 'Email'),
                       keyboardType: TextInputType.emailAddress,
                       autofillHints: const [AutofillHints.email],
-                      textInputAction: TextInputAction.next,
+                      textInputAction: _mode == _Mode.quick ? TextInputAction.go : TextInputAction.next,
+                      onSubmitted: _mode == _Mode.quick ? (_) => _submit() : null,
                     ),
-                    TextField(
-                      controller: _password,
-                      decoration: InputDecoration(labelText: _signup ? 'Password (8+ characters)' : 'Password'),
-                      obscureText: true,
-                      autofillHints: [_signup ? AutofillHints.newPassword : AutofillHints.password],
-                      onSubmitted: (_) => _submit(),
-                    ),
+                    if (_mode != _Mode.quick)
+                      TextField(
+                        controller: _password,
+                        decoration: InputDecoration(labelText: _mode == _Mode.signup ? 'Password (8+ characters)' : 'Password'),
+                        obscureText: true,
+                        autofillHints: [_mode == _Mode.signup ? AutofillHints.newPassword : AutofillHints.password],
+                        onSubmitted: (_) => _submit(),
+                      ),
                   ]),
                 ),
                 if (_error != null) ...[
@@ -101,18 +121,13 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                   Text(_error!, style: const TextStyle(color: C.danger)),
                 ],
                 const SizedBox(height: 26),
-                PrimaryButton(_signup ? 'Create account' : 'Log in', busy: _busy, onPressed: _submit),
+                PrimaryButton(action, busy: _busy, onPressed: _submit),
                 const SizedBox(height: 10),
-                Center(
-                  child: GhostButton(
-                    _signup ? 'I already have an account' : 'Create a new account',
-                    color: C.dim,
-                    onPressed: () => setState(() {
-                      _signup = !_signup;
-                      _error = null;
-                    }),
-                  ),
-                ),
+                Wrap(alignment: WrapAlignment.center, spacing: 4, children: [
+                  if (_mode != _Mode.quick) GhostButton('Quick start', color: C.dim, onPressed: () => _switch(_Mode.quick)),
+                  if (_mode != _Mode.signup) GhostButton('Sign up with a password', color: C.dim, onPressed: () => _switch(_Mode.signup)),
+                  if (_mode != _Mode.login) GhostButton('Log in', color: C.dim, onPressed: () => _switch(_Mode.login)),
+                ]),
                 const SizedBox(height: 18),
                 const Text(
                   'Coins are free and have no cash value. Results come from real NFL and NBA box scores.',

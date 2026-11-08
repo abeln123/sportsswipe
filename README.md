@@ -44,6 +44,16 @@ The simulator reaches the Mac's `localhost`. For a real iPhone on the same
 Wi-Fi, run the API with `PUBLIC_BASE_URL=http://<mac-ip>:8080` and the app with
 `flutter run --dart-define=API_BASE=http://<mac-ip>:8080`.
 
+## Export collected data
+
+```sh
+API=https://sportsswipe.fly.dev ADMIN_EMAIL=you@example.com ADMIN_PASSWORD=... python3 scripts/export_data.py
+```
+
+Writes `exports/<timestamp>/` with `users.csv`, `picks.csv` (one row per
+leg), `contest_entries.csv`, `contest_answers.csv` and `stats.json`, and
+prints the headline numbers. Admin accounts are left out of the stats.
+
 ## Tests
 
 ```sh

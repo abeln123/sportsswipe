@@ -10,6 +10,7 @@ import '../../card/sport_card.dart';
 import '../../core/api.dart';
 import '../../core/format.dart' as f;
 import '../../core/theme.dart';
+import '../../state/pick_queue.dart';
 import '../../state/session.dart';
 import '../../ui/widgets.dart';
 
@@ -201,7 +202,19 @@ class _ProfileTabState extends ConsumerState<_ProfileTab> {
       ),
       const Hr(v: 22),
       if (me.isAdmin) ArrowLink('Demo controls (admin)', color: C.under, onTap: () => context.go('/profile/admin')),
-      GhostButton('Log out', color: C.dim, onPressed: () => ref.read(sessionProvider.notifier).logout()),
+      GhostButton('Log out', color: C.dim, onPressed: () async {
+        if (ref.read(pickQueueProvider).isNotEmpty) {
+          toast(context, 'Saving picks before logging out…', duration: const Duration(seconds: 20));
+          final saved = await ref.read(pickQueueProvider.notifier).drain();
+          if (!context.mounted) return;
+          if (!saved) {
+            toast(context, 'Some picks haven\'t reached the server yet. Check the connection and try again.', ok: false);
+            return;
+          }
+          ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        }
+        await ref.read(sessionProvider.notifier).logout();
+      }),
     ]);
   }
 }

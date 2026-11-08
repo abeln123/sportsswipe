@@ -47,6 +47,10 @@ class SessionNotifier extends AsyncNotifier<Me?> {
     await _set(await api.post('/auth/signup', {'email': email, 'password': password, 'displayName': displayName}));
   }
 
+  Future<void> quick(String displayName, String? email) async {
+    await _set(await api.post('/auth/quick', {'displayName': displayName, if (email != null && email.isNotEmpty) 'email': email}));
+  }
+
   Future<void> refreshMe() async {
     final r = await api.raw('GET', '/auth/me');
     if (r.ok) state = AsyncData(Me(r.map));

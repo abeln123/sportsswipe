@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
@@ -11,6 +12,7 @@ import '../../card/sport_card.dart';
 import '../../core/api.dart';
 import '../../core/format.dart' as f;
 import '../../core/theme.dart';
+import '../../state/session.dart';
 import '../../ui/shell.dart';
 import '../../ui/swipe.dart';
 import '../../ui/widgets.dart';
@@ -25,15 +27,15 @@ class _Question {
   final PlayableCard card;
 }
 
-class ContestEntryScreen extends StatefulWidget {
+class ContestEntryScreen extends ConsumerStatefulWidget {
   const ContestEntryScreen({super.key, required this.dayId});
   final int dayId;
 
   @override
-  State<ContestEntryScreen> createState() => _ContestEntryScreenState();
+  ConsumerState<ContestEntryScreen> createState() => _ContestEntryScreenState();
 }
 
-class _ContestEntryScreenState extends State<ContestEntryScreen> {
+class _ContestEntryScreenState extends ConsumerState<ContestEntryScreen> {
   Map<String, dynamic>? _slate;
   Object? _error;
   List<_Question> _qs = [];
@@ -44,7 +46,7 @@ class _ContestEntryScreenState extends State<ContestEntryScreen> {
   bool _busy = false;
   final _tiebreak = TextEditingController();
 
-  String get _draftKey => 'ss.contest.${widget.dayId}';
+  String get _draftKey => 'ss.contest.${ref.read(sessionProvider).value?.id}.${widget.dayId}';
 
   @override
   void initState() {

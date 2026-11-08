@@ -25,6 +25,7 @@ const SESSION_DAYS: i64 = 30;
 pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/auth/signup", post(signup))
+        .route("/auth/quick", post(quick))
         .route("/auth/login", post(login))
         .route("/auth/logout", post(logout))
         .route("/auth/me", get(me))
@@ -146,24 +147,60 @@ fn normalize_handle(display_name: &str) -> String {
     if h.is_empty() { "PLAYER".into() } else { h }
 }
 
-async fn signup(State(state): State<AppState>, Json(req): Json<SignupReq>) -> ApiResult<Response> {
-    let email = req.email.trim().to_lowercase();
-    let display_name = req.display_name.trim().to_string();
+fn valid_email(email: &str) -> ApiResult<()> {
     if !email.contains('@') || email.len() > 200 {
         return Err(ApiError::BadRequest("Enter a valid email.".into()));
     }
+    Ok(())
+}
+
+fn valid_display_name(name: &str) -> ApiResult<()> {
+    if name.is_empty() || name.chars().count() > 40 {
+        return Err(ApiError::BadRequest("Enter a display name up to 40 characters.".into()));
+    }
+    Ok(())
+}
+
+async fn signup(State(state): State<AppState>, Json(req): Json<SignupReq>) -> ApiResult<Response> {
+    let email = req.email.trim().to_lowercase();
+    let display_name = req.display_name.trim().to_string();
+    valid_email(&email)?;
     if req.password.len() < 8 {
         return Err(ApiError::BadRequest("Use at least 8 characters for your password.".into()));
     }
-    if display_name.is_empty() || display_name.chars().count() > 40 {
-        return Err(ApiError::BadRequest("Enter a display name up to 40 characters.".into()));
-    }
+    valid_display_name(&display_name)?;
+    create_account(&state, &email, &req.password, &display_name).await
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct QuickReq {
+    display_name: String,
+    email: Option<String>,
+}
+
+/// One-tap account for in-person demos: a name and an optional email. The
+/// password is random, so the account lives only in this session.
+async fn quick(State(state): State<AppState>, Json(req): Json<QuickReq>) -> ApiResult<Response> {
+    let display_name = req.display_name.trim().to_string();
+    valid_display_name(&display_name)?;
+    let email = match req.email.map(|e| e.trim().to_lowercase()).filter(|e| !e.is_empty()) {
+        Some(e) => {
+            valid_email(&e)?;
+            e
+        }
+        None => format!("guest-{}@quick.sportsswipe", Uuid::new_v4().simple()),
+    };
+    create_account(&state, &email, &random_token(24), &display_name).await
+}
+
+async fn create_account(state: &AppState, email: &str, password: &str, display_name: &str) -> ApiResult<Response> {
     let hash = Argon2::default()
-        .hash_password(req.password.as_bytes(), &SaltString::generate(&mut OsRng))
+        .hash_password(password.as_bytes(), &SaltString::generate(&mut OsRng))
         .map_err(|e| ApiError::Internal(anyhow::anyhow!("hash: {e}")))?
         .to_string();
-    let is_admin = state.config.admin_emails.contains(&email);
-    let handle = normalize_handle(&display_name);
+    let is_admin = state.config.admin_emails.iter().any(|a| a == email);
+    let handle = normalize_handle(display_name);
 
     let mut tx = state.pool.begin().await?;
     let user_id: Option<Uuid> = sqlx::query_scalar(
@@ -186,7 +223,7 @@ async fn signup(State(state): State<AppState>, Json(req): Json<SignupReq>) -> Ap
                ON CONFLICT ((upper(handle)), tag) DO NOTHING"#,
         )
         .bind(user_id)
-        .bind(&display_name)
+        .bind(display_name)
         .bind(&handle)
         .bind(&tag)
         .execute(&mut *tx)
@@ -214,8 +251,8 @@ async fn signup(State(state): State<AppState>, Json(req): Json<SignupReq>) -> Ap
         .await?;
     tx.commit().await?;
 
-    let (token, cookie) = start_session(&state, user_id).await?;
-    let mut body = me_json(&state, user_id).await?;
+    let (token, cookie) = start_session(state, user_id).await?;
+    let mut body = me_json(state, user_id).await?;
     body["sessionToken"] = json!(token);
     Ok(with_cookie(cookie, body))
 }
@@ -245,10 +282,17 @@ async fn login(State(state): State<AppState>, Json(req): Json<LoginReq>) -> ApiR
     Ok(with_cookie(cookie, body))
 }
 
-async fn logout(State(state): State<AppState>, jar: CookieJar) -> ApiResult<Response> {
-    if let Some(c) = jar.get(COOKIE) {
+async fn logout(State(state): State<AppState>, jar: CookieJar, headers: HeaderMap) -> ApiResult<Response> {
+    let token = jar.get(COOKIE).map(|c| c.value().to_string()).or_else(|| {
+        headers
+            .get(header::AUTHORIZATION)
+            .and_then(|v| v.to_str().ok())
+            .and_then(|v| v.strip_prefix("Bearer "))
+            .map(str::to_string)
+    });
+    if let Some(token) = token {
         sqlx::query("DELETE FROM sessions WHERE token_hash = $1")
-            .bind(ss_db::sha256_hex(c.value().as_bytes()))
+            .bind(ss_db::sha256_hex(token.as_bytes()))
             .execute(&state.pool)
             .await?;
     }

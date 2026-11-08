@@ -1,4 +1,5 @@
 .local/
+exports/
 .env
 backend/target/
 app/build/
