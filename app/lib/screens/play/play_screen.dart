@@ -85,7 +85,7 @@ class _PlayScreenState extends ConsumerState<PlayScreen> with SingleTickerProvid
                   animation: _menu,
                   child: navigation,
                   builder: (context, panel) {
-                    if (_menu.value == 0) return const SizedBox.shrink();
+                    if (_menu.value == 0) return const Positioned(left: 0, top: 0, child: SizedBox.shrink());
                     return Positioned.fill(
                       child: Stack(
                         children: [
