@@ -1,0 +1,48 @@
+# Deploy from the repo root:
+#   fly launch --no-deploy --copy-config --config infra/fly.toml
+#   fly secrets set --config infra/fly.toml \
+#     DATABASE_URL='postgres://tsdbadmin:...@<service>.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require' \
+#     ADMIN_EMAILS='you@example.com'
+#   fly deploy --config infra/fly.toml
+#   fly ssh console --config infra/fly.toml -C "worker backfill 21"   # first load of NFL/NBA data
+
+app = "sportsswipe"
+primary_region = "iad"
+
+[build]
+  dockerfile = "../Dockerfile"
+
+[env]
+  PUBLIC_BASE_URL = "https://sportsswipe.fly.dev"
+  COOKIE_SECURE = "true"
+  API_DB_POOL = "10"
+  WORKER_DB_POOL = "5"
+
+[processes]
+  app = "api"
+  worker = "worker"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 1
+  processes = ["app"]
+
+  [[http_service.checks]]
+    grace_period = "10s"
+    interval = "15s"
+    method = "GET"
+    path = "/v1/healthz"
+    timeout = "3s"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"
+  processes = ["app"]
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"
+  processes = ["worker"]

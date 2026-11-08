@@ -1,0 +1,20 @@
+[package]
+name = "ss-worker"
+edition.workspace = true
+version.workspace = true
+
+[[bin]]
+name = "worker"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = { workspace = true }
+chrono = { workspace = true }
+serde_json = { workspace = true }
+sqlx = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+ss-core = { workspace = true }
+ss-db = { workspace = true }
+ss-espn = { workspace = true }

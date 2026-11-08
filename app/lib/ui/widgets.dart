@@ -1,0 +1,404 @@
+import 'dart:math' as math;
+
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+
+import '../core/format.dart' as f;
+import '../core/theme.dart';
+
+class PrimaryButton extends StatelessWidget {
+  const PrimaryButton(this.label, {super.key, required this.onPressed, this.busy = false, this.focusRing = false});
+
+  final String label;
+  final VoidCallback? onPressed;
+  final bool busy;
+  final bool focusRing;
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = onPressed != null && !busy;
+    return Container(
+      padding: focusRing ? const EdgeInsets.all(3) : EdgeInsets.zero,
+      decoration: focusRing ? BoxDecoration(border: Border.all(color: C.green, width: 1.5)) : null,
+      child: SizedBox(
+        width: double.infinity,
+        height: 52,
+        child: TextButton(
+          onPressed: enabled ? onPressed : null,
+          style: TextButton.styleFrom(
+            backgroundColor: enabled ? C.green : C.disabled,
+            foregroundColor: enabled ? const Color(0xFF0D2416) : C.dim,
+            shape: const RoundedRectangleBorder(),
+            textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16, fontFamily: 'Inter'),
+          ),
+          child: busy
+              ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF0D2416)))
+              : Text(label),
+        ),
+      ),
+    );
+  }
+}
+
+class GhostButton extends StatelessWidget {
+  const GhostButton(this.label, {super.key, required this.onPressed, this.color = C.text, this.bold = false});
+
+  final String label;
+  final VoidCallback? onPressed;
+  final Color color;
+  final bool bold;
+
+  @override
+  Widget build(BuildContext context) => TextButton(
+        onPressed: onPressed,
+        style: TextButton.styleFrom(foregroundColor: color, shape: const RoundedRectangleBorder()),
+        child: Text(label, style: TextStyle(fontSize: 15, fontWeight: bold ? FontWeight.w700 : FontWeight.w500)),
+      );
+}
+
+/// "Label →" link style used throughout the screens.
+class ArrowLink extends StatelessWidget {
+  const ArrowLink(this.label, {super.key, required this.onTap, this.color = C.text});
+
+  final String label;
+  final VoidCallback onTap;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Text('$label →', style: TextStyle(color: color, fontWeight: FontWeight.w700, fontSize: 14)),
+        ),
+      );
+}
+
+/// Underlined text tabs (Pending / Settled, Friends / Messages / Leagues).
+class UnderTabs extends StatelessWidget {
+  const UnderTabs({super.key, required this.labels, required this.index, required this.onChanged, this.counts, this.trailing});
+
+  final List<String> labels;
+  final List<int>? counts;
+  final int index;
+  final ValueChanged<int> onChanged;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: C.line))),
+      child: Row(
+        children: [
+          for (var i = 0; i < labels.length; i++)
+            InkWell(
+              onTap: () => onChanged(i),
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(6, 12, 14, 10),
+                margin: const EdgeInsets.only(right: 10),
+                decoration: BoxDecoration(
+                  border: Border(bottom: BorderSide(color: i == index ? C.green : Colors.transparent, width: 2)),
+                ),
+                child: Row(children: [
+                  Text(labels[i],
+                      style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: i == index ? FontWeight.w700 : FontWeight.w500,
+                          color: i == index ? (counts == null ? C.green : C.text) : C.dim)),
+                  if (counts != null) ...[
+                    const SizedBox(width: 10),
+                    Text('${counts![i]}', style: const TextStyle(fontSize: 13, color: C.dim, fontWeight: FontWeight.w600)),
+                  ],
+                ]),
+              ),
+            ),
+          const Spacer(),
+          ?trailing,
+        ],
+      ),
+    );
+  }
+}
+
+class PageTitle extends StatelessWidget {
+  const PageTitle(this.title, this.subtitle, {super.key});
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(top: 18, bottom: 14),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(title, style: T.h1),
+          const SizedBox(height: 6),
+          Text(subtitle, style: T.dim),
+        ]),
+      );
+}
+
+class EmptyState extends StatelessWidget {
+  const EmptyState({super.key, required this.icon, required this.title, required this.body, this.action});
+  final IconData icon;
+  final String title;
+  final String body;
+  final Widget? action;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 48),
+        child: Column(children: [
+          Icon(icon, color: C.dim, size: 36),
+          const SizedBox(height: 14),
+          Text(title, style: T.h2, textAlign: TextAlign.center),
+          const SizedBox(height: 8),
+          Text(body, style: T.dim, textAlign: TextAlign.center),
+          if (action != null) ...[const SizedBox(height: 40), action!],
+        ]),
+      );
+}
+
+class Hr extends StatelessWidget {
+  const Hr({super.key, this.v = 18});
+  final double v;
+  @override
+  Widget build(BuildContext context) => Container(height: 1, color: C.line, margin: EdgeInsets.symmetric(vertical: v));
+}
+
+/// Initials block with a colored left rule (friends, profile).
+class InitialsBadge extends StatelessWidget {
+  const InitialsBadge(this.initials, {super.key, this.color = const Color(0xFF8CC8E8), this.size = 18});
+  final String initials;
+  final Color color;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: EdgeInsets.symmetric(horizontal: size * 0.6, vertical: size * 0.5),
+        decoration: BoxDecoration(border: Border(left: BorderSide(color: color, width: 2))),
+        child: Text(initials, style: TextStyle(color: color, fontWeight: FontWeight.w800, fontSize: size)),
+      );
+}
+
+String initialsOf(String name) {
+  final parts = name.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
+  if (parts.isEmpty) return '?';
+  return (parts.first[0] + (parts.length > 1 ? parts.last[0] : '')).toUpperCase();
+}
+
+/// Three-segment progress: locked, live, final.
+class StageBar extends StatelessWidget {
+  const StageBar({super.key, required this.stage});
+  final String stage;
+
+  @override
+  Widget build(BuildContext context) {
+    final n = switch (stage) { 'final' => 3, 'live' => 2, _ => 1 };
+    return Row(children: [
+      for (var i = 0; i < 3; i++) ...[
+        if (i > 0) const SizedBox(width: 3),
+        Expanded(child: Container(height: 3, color: i < n ? const Color(0xFFA9C9B7) : const Color(0xFF34474A))),
+      ],
+    ]);
+  }
+}
+
+class SideText extends StatelessWidget {
+  const SideText({super.key, required this.side, required this.line, this.rest, this.size = 15});
+  final String side;
+  final double line;
+  final String? rest;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) => Text.rich(
+        TextSpan(children: [
+          TextSpan(
+            text: '${f.cap(side)} ${f.line(line)}',
+            style: TextStyle(color: side == 'over' ? C.over : C.under, fontWeight: FontWeight.w700, fontSize: size),
+          ),
+          if (rest != null) TextSpan(text: '  $rest', style: TextStyle(color: C.text, fontSize: size)),
+        ]),
+      );
+}
+
+Future<R?> showSheet<R>(BuildContext context, Widget Function(BuildContext) builder) {
+  return showModalBottomSheet<R>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: C.sheet,
+    barrierColor: Colors.black.withValues(alpha: 0.55),
+    shape: const RoundedRectangleBorder(),
+    builder: (ctx) => SafeArea(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.9),
+        child: SingleChildScrollView(
+          padding: EdgeInsets.fromLTRB(24, 28, 24, 16 + MediaQuery.of(ctx).viewInsets.bottom),
+          child: builder(ctx),
+        ),
+      ),
+    ),
+  );
+}
+
+void toast(BuildContext context, String message, {String? action, VoidCallback? onAction, bool ok = true, Duration? duration}) {
+  final m = ScaffoldMessenger.of(context);
+  m.hideCurrentSnackBar();
+  m.showSnackBar(SnackBar(
+    duration: duration ?? const Duration(seconds: 4),
+    content: Row(children: [
+      Icon(ok ? Icons.check : Icons.info_outline, size: 18, color: ok ? C.green : C.danger),
+      const SizedBox(width: 14),
+      Expanded(child: Text(message)),
+    ]),
+    action: action == null ? null : SnackBarAction(label: action, textColor: C.text, onPressed: onAction ?? () {}),
+  ));
+}
+
+/// Wager ring: drag around the ring or tap −/+ in steps of 25.
+class WagerRing extends StatelessWidget {
+  const WagerRing({super.key, required this.value, required this.max, required this.onChanged, this.dark = false, this.size = 92});
+
+  final int value;
+  final int max;
+  final ValueChanged<int> onChanged;
+  final bool dark;
+  final double size;
+
+  static const step = 25;
+
+  void _fromOffset(Offset local) {
+    final c = Offset(size / 2, size / 2);
+    final d = local - c;
+    var a = math.atan2(d.dx, -d.dy);
+    if (a < 0) a += 2 * math.pi;
+    final frac = a / (2 * math.pi);
+    final cap = math.min(max, 100000);
+    var v = (frac * cap).round();
+    if (frac > 0.97) v = cap;
+    onChanged(v.clamp(0, cap));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final fg = dark ? C.text : C.ink;
+    final cap = math.max(1, math.min(max, 100000));
+    final btnColor = dark ? C.text : C.ink;
+    return Semantics(
+      label: 'Coin wager',
+      value: '$value coins',
+      increasedValue: '${math.min(value + step, max)} coins',
+      decreasedValue: '${math.max(value - step, 0)} coins',
+      onIncrease: () => onChanged(math.min(value + step, max)),
+      onDecrease: () => onChanged(math.max(value - step, 0)),
+      child: Focus(
+        onKeyEvent: (_, e) {
+          if (e is! KeyDownEvent) return KeyEventResult.ignored;
+          if (e.logicalKey == LogicalKeyboardKey.arrowUp) {
+            onChanged(math.min(value + step, max));
+            return KeyEventResult.handled;
+          }
+          if (e.logicalKey == LogicalKeyboardKey.arrowDown) {
+            onChanged(math.max(value - step, 0));
+            return KeyEventResult.handled;
+          }
+          return KeyEventResult.ignored;
+        },
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          IconButton(
+            onPressed: value > 0 ? () => onChanged(math.max(value - step, 0)) : null,
+            icon: Icon(Icons.remove, color: value > 0 ? btnColor : btnColor.withValues(alpha: 0.3)),
+          ),
+          GestureDetector(
+            onPanDown: (d) => _fromOffset(d.localPosition),
+            onPanUpdate: (d) => _fromOffset(d.localPosition),
+            child: SizedBox(
+              width: size,
+              height: size,
+              child: CustomPaint(
+                painter: _RingPainter(value / cap, dark),
+                child: Center(
+                  child: Column(mainAxisSize: MainAxisSize.min, children: [
+                    Text(f.coins(value), style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: fg)),
+                    Text('coins', style: TextStyle(fontSize: 12, color: fg.withValues(alpha: 0.7))),
+                  ]),
+                ),
+              ),
+            ),
+          ),
+          IconButton(
+            onPressed: value < max ? () => onChanged(math.min(value + step, max)) : null,
+            icon: Icon(Icons.add, color: value < max ? btnColor : btnColor.withValues(alpha: 0.3)),
+          ),
+        ]),
+      ),
+    );
+  }
+}
+
+class _RingPainter extends CustomPainter {
+  _RingPainter(this.frac, this.dark);
+  final double frac;
+  final bool dark;
+
+  @override
+  void paint(Canvas canvas, Size s) {
+    final c = s.center(Offset.zero);
+    final r = s.width / 2 - 5;
+    canvas.drawCircle(c, r, Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 5
+      ..color = dark ? const Color(0xFF2F4A40) : const Color(0xFFB9D3C4));
+    final sweep = 2 * math.pi * frac.clamp(0.0, 1.0);
+    if (sweep > 0) {
+      canvas.drawArc(Rect.fromCircle(center: c, radius: r), -math.pi / 2, sweep, false, Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 5
+        ..strokeCap = StrokeCap.round
+        ..color = const Color(0xFF2FA968));
+    }
+    final a = -math.pi / 2 + sweep;
+    canvas.drawCircle(c + Offset(math.cos(a), math.sin(a)) * r, 4.5, Paint()..color = const Color(0xFF2FA968));
+  }
+
+  @override
+  bool shouldRepaint(covariant _RingPainter old) => old.frac != frac || old.dark != dark;
+}
+
+class Labeled extends StatelessWidget {
+  const Labeled(this.label, this.value, {super.key, this.suffix, this.valueColor = C.text});
+  final String label;
+  final String value;
+  final String? suffix;
+  final Color valueColor;
+
+  @override
+  Widget build(BuildContext context) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(label, style: T.small.copyWith(fontSize: 13)),
+        const SizedBox(height: 6),
+        Text.rich(TextSpan(children: [
+          TextSpan(text: value, style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: valueColor)),
+          if (suffix != null) TextSpan(text: suffix, style: const TextStyle(fontSize: 15, color: C.dim)),
+        ])),
+      ]);
+}
+
+class Loading extends StatelessWidget {
+  const Loading({super.key});
+  @override
+  Widget build(BuildContext context) =>
+      const Padding(padding: EdgeInsets.all(40), child: Center(child: CircularProgressIndicator(color: C.green, strokeWidth: 2)));
+}
+
+class ErrorText extends StatelessWidget {
+  const ErrorText(this.error, {super.key, this.onRetry});
+  final Object error;
+  final VoidCallback? onRetry;
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 32),
+        child: Column(children: [
+          Text(error.toString(), style: T.dim, textAlign: TextAlign.center),
+          if (onRetry != null) GhostButton('Try again', onPressed: onRetry, color: C.green),
+        ]),
+      );
+}

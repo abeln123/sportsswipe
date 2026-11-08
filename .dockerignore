@@ -1,0 +1,7 @@
+.git
+.local
+backend/target
+app/build
+app/.dart_tool
+app/test/failures
+**/.DS_Store
