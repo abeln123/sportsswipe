@@ -26,7 +26,9 @@ class AiScreen extends ConsumerStatefulWidget {
 
 class _AiScreenState extends ConsumerState<AiScreen> {
   final _q = TextEditingController(), _scroll = ScrollController();
-  late Future<Map<String, dynamic>> _suggestions = api.get('/analyst/suggestions');
+  late Future<Map<String, dynamic>> _suggestions = api.get(
+    '/analyst/suggestions',
+  );
   final _turns = <Map<String, dynamic>>[];
   bool _busy = false, _restored = false;
   String get _key => 'ss.ai.${ref.read(sessionProvider).value?.id}';
@@ -49,7 +51,13 @@ class _AiScreenState extends ConsumerState<AiScreen> {
     if (!mounted) return;
     try {
       final raw = prefs.getString(key);
-      if (raw != null) _turns.addAll((jsonDecode(raw) as List).map((e) => (e as Map).cast<String, dynamic>()));
+      if (raw != null) {
+        _turns.addAll(
+          (jsonDecode(raw) as List).map(
+            (e) => (e as Map).cast<String, dynamic>(),
+          ),
+        );
+      }
     } catch (_) {}
     setState(() => _restored = true);
     _consume(ref.read(researchRequestProvider));
@@ -64,7 +72,12 @@ class _AiScreenState extends ConsumerState<AiScreen> {
   Future<void> _persist() async {
     final key = _key;
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(key, jsonEncode(_turns.length > 10 ? _turns.sublist(_turns.length - 10) : _turns));
+    await prefs.setString(
+      key,
+      jsonEncode(
+        _turns.length > 10 ? _turns.sublist(_turns.length - 10) : _turns,
+      ),
+    );
   }
 
   Future<void> _ask(String question, {Map<String, dynamic>? form}) async {
@@ -80,11 +93,33 @@ class _AiScreenState extends ConsumerState<AiScreen> {
       if (MediaQuery.of(context).disableAnimations) {
         _scroll.jumpTo(_scroll.position.maxScrollExtent);
       } else {
-        _scroll.animateTo(_scroll.position.maxScrollExtent, duration: const Duration(milliseconds: 240), curve: Curves.easeOutCubic);
+        _scroll.animateTo(
+          _scroll.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 240),
+          curve: Curves.easeOutCubic,
+        );
       }
     });
     try {
-      turn['a'] = form != null ? await api.post('/analyst/form', form) : await api.post('/analyst/ask', {'question': question});
+      turn['a'] = form != null
+          ? await api.post('/analyst/form', form)
+          : await api.post('/analyst/ask', {
+              'question': question,
+              'context': _turns
+                  .where((t) => t != turn && t['a'] != null)
+                  .toList()
+                  .reversed
+                  .take(3)
+                  .toList()
+                  .reversed
+                  .map(
+                    (t) => {
+                      'question': t['q'],
+                      'plan': (t['a'] as Map)['researchPlan'],
+                    },
+                  )
+                  .toList(),
+            });
     } on ApiException catch (e) {
       turn['a'] = {'kind': 'error', 'answer': e.message};
     }
@@ -116,7 +151,12 @@ class _AiScreenState extends ConsumerState<AiScreen> {
                   setState(_turns.clear);
                   _persist();
                 },
-                itemBuilder: (_) => [const PopupMenuItem(value: 'clear', child: Text('Clear conversation'))],
+                itemBuilder: (_) => [
+                  const PopupMenuItem(
+                    value: 'clear',
+                    child: Text('Clear conversation'),
+                  ),
+                ],
                 icon: const Icon(Icons.more_horiz, color: C.dim, size: 20),
               ),
             ),
@@ -137,15 +177,21 @@ class _AiScreenState extends ConsumerState<AiScreen> {
                         Container(
                           width: 8,
                           height: 8,
-                          decoration: const BoxDecoration(color: C.green, shape: BoxShape.circle),
+                          decoration: const BoxDecoration(
+                            color: C.green,
+                            shape: BoxShape.circle,
+                          ),
                         ),
                         const SizedBox(width: 8),
-                        Text('LIVE STAT BREAKDOWNS', style: T.label.copyWith(color: C.green)),
+                        Text(
+                          'SPORTS RESEARCH',
+                          style: T.label.copyWith(color: C.green),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 8),
                     const Text(
-                      'Start with a player.\nFollow the numbers.',
+                      'Ask about a player,\na team, or a pattern.',
                       style: T.h1,
                     ),
                     const SizedBox(height: 22),
@@ -162,64 +208,68 @@ class _AiScreenState extends ConsumerState<AiScreen> {
                             }),
                           );
                         }
-                        if (!snap.hasData) return const SizedBox(height: 280, child: Loading());
-                        final questions = (snap.data!['suggestions'] as List).cast<Map<String, dynamic>>();
+                        if (!snap.hasData) {
+                          return const SizedBox(height: 280, child: Loading());
+                        }
+                        final questions = (snap.data!['suggestions'] as List)
+                            .cast<Map<String, dynamic>>();
                         if (questions.isEmpty) {
                           return const Padding(
                             padding: EdgeInsets.symmetric(vertical: 16),
-                            child: Text('No open player lines right now. Ask about recent games below.', style: T.dim),
+                            child: Text(
+                              'No open player lines right now. Ask about recent games below.',
+                              style: T.dim,
+                            ),
                           );
                         }
                         return Column(
                           children: [
                             for (final x in questions)
-                              Padding(
-                                padding: const EdgeInsets.only(bottom: 10),
-                                child: InkWell(
-                                  borderRadius: BorderRadius.circular(10),
-                                  onTap: () => _ask(x['label'] as String, form: {'playerId': x['playerId'], 'statKey': x['statKey'], 'n': 5}),
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFF0E241E),
-                                      borderRadius: BorderRadius.circular(10),
-                                      border: Border.all(color: C.line),
+                              InkWell(
+                                onTap: () => _ask(
+                                  x['label'] as String,
+                                  form: {
+                                    'playerId': x['playerId'],
+                                    'statKey': x['statKey'],
+                                    'n': 5,
+                                  },
+                                ),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 18,
+                                  ),
+                                  decoration: const BoxDecoration(
+                                    border: Border(
+                                      bottom: BorderSide(color: C.line),
                                     ),
-                                    child: Row(
-                                      children: [
-                                        if (x['card'] != null) ...[
-                                          JerseyIcon(spec: CardSpec.fromJson((x['card'] as Map).cast<String, dynamic>()), size: 50),
-                                          const SizedBox(width: 14),
-                                        ],
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                            children: [
-                                              if (x['card'] != null)
-                                                Padding(
-                                                  padding: const EdgeInsets.only(bottom: 3),
-                                                  child: Text(
-                                                    '${(x['card'] as Map)['teamAbbr']} · ${((x['card'] as Map)['league'] as String).toUpperCase()}',
-                                                    style: T.label.copyWith(color: C.green, fontSize: 10.5),
-                                                  ),
-                                                ),
-                                              Text(x['label'] as String, style: T.h3),
-                                            ],
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      if (x['card'] != null) ...[
+                                        JerseyIcon(
+                                          spec: CardSpec.fromJson(
+                                            (x['card'] as Map)
+                                                .cast<String, dynamic>(),
                                           ),
+                                          size: 42,
                                         ),
-                                        const SizedBox(width: 10),
-                                        Container(
-                                          width: 32,
-                                          height: 32,
-                                          decoration: BoxDecoration(
-                                            color: C.green.withValues(alpha: 0.14),
-                                            borderRadius: BorderRadius.circular(6),
-                                            border: Border.all(color: C.green.withValues(alpha: 0.4)),
-                                          ),
-                                          child: const Icon(Icons.north_east, size: 16, color: C.green),
-                                        ),
+                                        const SizedBox(width: 14),
                                       ],
-                                    ),
+                                      Expanded(
+                                        child: Text(
+                                          x['label'] as String,
+                                          style: T.body.copyWith(
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 14),
+                                      const Icon(
+                                        Icons.north_east,
+                                        size: 18,
+                                        color: C.green,
+                                      ),
+                                    ],
                                   ),
                                 ),
                               ),
@@ -229,38 +279,43 @@ class _AiScreenState extends ConsumerState<AiScreen> {
                     ),
                   ],
                   for (final (i, t) in _turns.indexed) ...[
-                    Container(
-                      margin: const EdgeInsets.only(top: 6, bottom: 14),
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF122C24),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border(left: const BorderSide(color: C.green, width: 3)),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 14, bottom: 22),
+                      child: Text(
+                        t['q'] as String,
+                        style: T.h2.copyWith(fontSize: 21, height: 1.35),
                       ),
-                      child: Text(t['q'] as String, style: T.h3.copyWith(color: C.text)),
                     ),
                     if (t['a'] != null)
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF0E241E),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: C.line),
-                        ),
-                        child: _Answer((t['a'] as Map).cast<String, dynamic>(), key: ValueKey(i)),
+                      _Answer(
+                        (t['a'] as Map).cast<String, dynamic>(),
+                        key: ValueKey(i),
                       )
                     else
                       const Padding(
                         padding: EdgeInsets.symmetric(vertical: 18),
                         child: Row(
                           children: [
-                            SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 1.5, color: C.green)),
+                            SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 1.5,
+                                color: C.green,
+                              ),
+                            ),
                             SizedBox(width: 12),
-                            Text('Reading the game log…', style: T.small),
+                            Expanded(
+                              child: Text(
+                                'Checking the database and game history…',
+                                style: T.small,
+                              ),
+                            ),
                           ],
                         ),
                       ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 28),
+                    const Divider(color: C.line),
                   ],
                 ],
               ),
@@ -285,10 +340,10 @@ class _AiScreenState extends ConsumerState<AiScreen> {
                 Expanded(
                   child: TextField(
                     controller: _q,
-                    maxLength: 300,
+                    maxLength: 500,
                     textInputAction: TextInputAction.send,
                     decoration: const InputDecoration(
-                      hintText: 'Ask about any player or stat…',
+                      hintText: 'Ask about a player, team, or pattern…',
                       counterText: '',
                       border: InputBorder.none,
                       enabledBorder: InputBorder.none,
@@ -302,10 +357,16 @@ class _AiScreenState extends ConsumerState<AiScreen> {
                   tooltip: 'Ask analyst',
                   style: IconButton.styleFrom(
                     backgroundColor: _busy ? C.disabled : C.green,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(6),
+                    ),
                     minimumSize: const Size(36, 36),
                   ),
-                  icon: Icon(Icons.arrow_upward, size: 18, color: _busy ? C.dim : const Color(0xFF0D2416)),
+                  icon: Icon(
+                    Icons.arrow_upward,
+                    size: 18,
+                    color: _busy ? C.dim : const Color(0xFF0D2416),
+                  ),
                 ),
               ],
             ),
@@ -348,14 +409,23 @@ class _AnswerState extends ConsumerState<_Answer> {
   }
 
   PlayableCard? get _card =>
-      _fresh ?? (widget.a['playable'] == null ? null : PlayableCard.fromJson((widget.a['playable'] as Map).cast<String, dynamic>()));
+      _fresh ??
+      (widget.a['playable'] == null
+          ? null
+          : PlayableCard.fromJson(
+              (widget.a['playable'] as Map).cast<String, dynamic>(),
+            ));
   Future<void> _refresh({String? side}) async {
     if (_checking || _command != null) return;
     final old = _card;
     if (old == null) return;
     setState(() => _checking = true);
     try {
-      final r = await api.post('/analyst/form', {'playerId': old.card.playerId, 'statKey': old.market.statKey, 'n': 5});
+      final r = await api.post('/analyst/form', {
+        'playerId': old.card.playerId,
+        'statKey': old.market.statKey,
+        'n': 5,
+      });
       if (!mounted) return;
       if (r['playable'] == null) {
         setState(() {
@@ -364,7 +434,9 @@ class _AnswerState extends ConsumerState<_Answer> {
         });
         return;
       }
-      final fresh = PlayableCard.fromJson((r['playable'] as Map).cast<String, dynamic>());
+      final fresh = PlayableCard.fromJson(
+        (r['playable'] as Map).cast<String, dynamic>(),
+      );
       setState(() => _fresh = fresh);
       if (r['alreadyPickedEntryId'] != null) {
         setState(() {
@@ -374,8 +446,11 @@ class _AnswerState extends ConsumerState<_Answer> {
         return;
       }
       if (side != null) {
-        if (fresh.market.marketId != old.market.marketId || fresh.market.lineVersion != old.market.lineVersion) {
-          setState(() => _status = 'Line updated. Review the card before choosing.');
+        if (fresh.market.marketId != old.market.marketId ||
+            fresh.market.lineVersion != old.market.lineVersion) {
+          setState(
+            () => _status = 'Line updated. Review the card before choosing.',
+          );
           return;
         }
         _side = side;
@@ -383,9 +458,15 @@ class _AnswerState extends ConsumerState<_Answer> {
             .read(pickQueueProvider.notifier)
             .add(
               path: '/picks',
-              payload: {'marketId': fresh.market.marketId, 'lineVersion': fresh.market.lineVersion, 'side': side, 'stake': 0},
+              payload: {
+                'marketId': fresh.market.marketId,
+                'lineVersion': fresh.market.lineVersion,
+                'side': side,
+                'stake': 0,
+              },
               stake: 0,
-              label: '${fresh.card.fullName} · ${f.cap(side)} ${f.line(fresh.market.line)}',
+              label:
+                  '${fresh.card.fullName} · ${f.cap(side)} ${f.line(fresh.market.line)}',
             );
         setState(() => _status = 'Submitting…');
         ref.read(pickQueueProvider.notifier).flush();
@@ -413,7 +494,8 @@ class _AnswerState extends ConsumerState<_Answer> {
           Align(
             alignment: Alignment.centerLeft,
             child: TextButton.icon(
-              onPressed: () => shareObject(context, shareId: widget.a['shareId'] as String),
+              onPressed: () =>
+                  shareObject(context, shareId: widget.a['shareId'] as String),
               icon: const Icon(Icons.ios_share, size: 16),
               label: const Text('Share this research'),
             ),
@@ -437,10 +519,16 @@ class _AnswerState extends ConsumerState<_Answer> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          _status == 'Submitted' ? '${p.card.lastName} · ${f.cap(_side!)} ${f.line(p.market.line)}' : p.market.matchup,
+                          _status == 'Submitted'
+                              ? '${p.card.lastName} · ${f.cap(_side!)} ${f.line(p.market.line)}'
+                              : p.market.matchup,
                           style: T.h3,
                         ),
-                        Text(_status ?? '${f.line(p.market.line)} ${p.market.statLabel.toLowerCase()}', style: T.small),
+                        Text(
+                          _status ??
+                              '${f.line(p.market.line)} ${p.market.statLabel.toLowerCase()}',
+                          style: T.small,
+                        ),
                       ],
                     ),
                   ),
@@ -458,7 +546,9 @@ class _AnswerState extends ConsumerState<_Answer> {
             ),
           ),
           AnimatedSize(
-            duration: MediaQuery.of(context).disableAnimations ? Duration.zero : const Duration(milliseconds: 260),
+            duration: MediaQuery.of(context).disableAnimations
+                ? Duration.zero
+                : const Duration(milliseconds: 260),
             alignment: Alignment.topCenter,
             child: !_expanded
                 ? const SizedBox(width: double.infinity)
@@ -470,17 +560,25 @@ class _AnswerState extends ConsumerState<_Answer> {
                           enabled: !_checking && _command == null,
                           verticalDrag: false,
                           onSwipe: (side) => _refresh(side: side),
-                          child: SportCard(spec: p.card, market: p.market, width: 300),
+                          child: SportCard(
+                            spec: p.card,
+                            market: p.market,
+                            width: 300,
+                          ),
                         ),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             TextButton(
-                              onPressed: _checking || _command != null ? null : () => _refresh(side: 'under'),
+                              onPressed: _checking || _command != null
+                                  ? null
+                                  : () => _refresh(side: 'under'),
                               child: Text('← Under ${f.line(p.market.line)}'),
                             ),
                             TextButton(
-                              onPressed: _checking || _command != null ? null : () => _refresh(side: 'over'),
+                              onPressed: _checking || _command != null
+                                  ? null
+                                  : () => _refresh(side: 'over'),
                               child: Text('Over ${f.line(p.market.line)} →'),
                             ),
                           ],

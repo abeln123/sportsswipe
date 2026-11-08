@@ -1,0 +1,230 @@
+{
+  "answer": "Josh Allen threw at least one interception in 2 of 6 matching games (33.3%).",
+  "card": {
+    "cardNo": null,
+    "colorway": {
+      "accent": "FFFFFF",
+      "base": "00338D",
+      "numberFill": "FFFFFF",
+      "numberOutline": "C60C30",
+      "trim": "C60C30"
+    },
+    "firstName": "Josh",
+    "fullName": "Josh Allen",
+    "headshotUrl": null,
+    "jerseyNumber": "17",
+    "lastName": "Allen",
+    "league": "nfl",
+    "logoUrl": null,
+    "playerId": 95,
+    "position": "QB",
+    "series": "Debut Series",
+    "teamAbbr": "BUF",
+    "teamName": "Buffalo Bills"
+  },
+  "chart": {
+    "bars": [
+      {
+        "detail": "Sep 2018",
+        "label": "BAL",
+        "value": 0.0
+      },
+      {
+        "detail": "Dec 2019",
+        "label": "BAL",
+        "value": 0.0
+      },
+      {
+        "detail": "Oct 2022",
+        "label": "BAL",
+        "value": 1.0
+      },
+      {
+        "detail": "Sep 2024",
+        "label": "BAL",
+        "value": 0.0
+      },
+      {
+        "detail": "Sep 2025",
+        "label": "BAL",
+        "value": 0.0
+      },
+      {
+        "detail": "Nov 2026",
+        "label": "BAL",
+        "value": 1.0
+      }
+    ],
+    "caption": "Most recent 6 matching games \u00b7 6 in the full sample",
+    "label": "Passing interceptions",
+    "latest": 5,
+    "operator": "gt",
+    "threshold": 0.0
+  },
+  "comparison": {
+    "average": 0.8,
+    "games": 129,
+    "hits": 68,
+    "label": "Other games",
+    "rate": 52.7
+  },
+  "dataAsOf": "2026-11-08T15:42:59.729807Z",
+  "definition": "2017\u20132026 \u00b7 regular season \u00b7 vs BAL. Filters are applied before taking the most recent N games. Latest official stored box-score revisions are combined with ESPN game logs/schedules and deduplicated by event ID. Missing/DNP statistics are excluded, never treated as zero. Dates shown oldest to latest. Regular season is the default; playoffs are included only when requested. Rest comparisons use complete team schedules, not just player appearances. Calculation: gt 0. This is descriptive history, not a causal claim.",
+  "games": [
+    {
+      "date": "2018-09-09T17:00:00Z",
+      "eventId": "401030711",
+      "home": false,
+      "matched": false,
+      "opponent": "BAL",
+      "pointsAgainst": 47,
+      "pointsFor": 3,
+      "restDays": null,
+      "result": "L",
+      "source": "espn",
+      "url": "https://www.espn.com/nfl/boxscore/_/gameId/401030711",
+      "value": 0.0
+    },
+    {
+      "date": "2019-12-08T18:00:00Z",
+      "eventId": "401127868",
+      "home": true,
+      "matched": false,
+      "opponent": "BAL",
+      "pointsAgainst": 24,
+      "pointsFor": 17,
+      "restDays": null,
+      "result": "L",
+      "source": "espn",
+      "url": "https://www.espn.com/nfl/boxscore/_/gameId/401127868",
+      "value": 0.0
+    },
+    {
+      "date": "2022-10-02T17:00:00Z",
+      "eventId": "401437750",
+      "home": false,
+      "matched": true,
+      "opponent": "BAL",
+      "pointsAgainst": 20,
+      "pointsFor": 23,
+      "restDays": null,
+      "result": "W",
+      "source": "espn",
+      "url": "https://www.espn.com/nfl/boxscore/_/gameId/401437750",
+      "value": 1.0
+    },
+    {
+      "date": "2024-09-30T00:20:00Z",
+      "eventId": "401671783",
+      "home": false,
+      "matched": false,
+      "opponent": "BAL",
+      "pointsAgainst": 35,
+      "pointsFor": 10,
+      "restDays": null,
+      "result": "L",
+      "source": "database",
+      "url": "https://www.espn.com/nfl/boxscore/_/gameId/401671783",
+      "value": 0.0
+    },
+    {
+      "date": "2025-09-08T00:20:00Z",
+      "eventId": "401772918",
+      "home": true,
+      "matched": false,
+      "opponent": "BAL",
+      "pointsAgainst": 40,
+      "pointsFor": 41,
+      "restDays": null,
+      "result": "W",
+      "source": "espn",
+      "url": "https://www.espn.com/nfl/boxscore/_/gameId/401772918",
+      "value": 0.0
+    },
+    {
+      "date": "2026-11-01T18:00:00Z",
+      "eventId": "401873026",
+      "home": true,
+      "matched": true,
+      "opponent": "BAL",
+      "pointsAgainst": 10,
+      "pointsFor": 36,
+      "restDays": null,
+      "result": "W",
+      "source": "espn",
+      "url": "https://www.espn.com/nfl/boxscore/_/gameId/401873026",
+      "value": 1.0
+    }
+  ],
+  "headline": "2 of 6 games \u00b7 33.3%",
+  "interpretation": "In the other 129 comparable games, the rate was 52.7% (68/129): 19.4 percentage points higher than in the selected games.",
+  "kind": "analysis",
+  "metric": {
+    "average": 0.3,
+    "games": 6,
+    "hits": 2,
+    "rate": 33.3,
+    "threshold": 0.0
+  },
+  "provenance": {
+    "cachedSources": 10,
+    "databaseGames": 1,
+    "fetchedSources": 0,
+    "source": "Sports Swipe database + ESPN historical records"
+  },
+  "range": {
+    "first": "2018-09-09T17:00:00Z",
+    "last": "2026-11-01T18:00:00Z"
+  },
+  "researchPlan": {
+    "clarification": null,
+    "endSeason": 2026,
+    "lastGames": null,
+    "league": "nfl",
+    "measure": "frequency",
+    "operator": "gt",
+    "opponent": "Baltimore Ravens",
+    "player": "Josh Allen",
+    "restMax": null,
+    "restMin": null,
+    "seasonType": "regular",
+    "startSeason": 2017,
+    "stat": "pass_int",
+    "subject": "player",
+    "team": null,
+    "threshold": 0.0,
+    "venue": "any"
+  },
+  "scope": "2017\u20132026 \u00b7 regular season \u00b7 vs BAL",
+  "sources": [
+    {
+      "label": "Sep 9, 2018 BAL \u00b7 ESPN box score",
+      "url": "https://www.espn.com/nfl/boxscore/_/gameId/401030711"
+    },
+    {
+      "label": "Dec 8, 2019 BAL \u00b7 ESPN box score",
+      "url": "https://www.espn.com/nfl/boxscore/_/gameId/401127868"
+    },
+    {
+      "label": "Oct 2, 2022 BAL \u00b7 ESPN box score",
+      "url": "https://www.espn.com/nfl/boxscore/_/gameId/401437750"
+    },
+    {
+      "label": "Sep 30, 2024 BAL \u00b7 ESPN box score",
+      "url": "https://www.espn.com/nfl/boxscore/_/gameId/401671783"
+    },
+    {
+      "label": "Sep 8, 2025 BAL \u00b7 ESPN box score",
+      "url": "https://www.espn.com/nfl/boxscore/_/gameId/401772918"
+    },
+    {
+      "label": "Nov 1, 2026 BAL \u00b7 ESPN box score",
+      "url": "https://www.espn.com/nfl/boxscore/_/gameId/401873026"
+    }
+  ],
+  "statLabel": "Passing interceptions",
+  "subjectName": "Josh Allen",
+  "warnings": [
+    "Small sample: only 6 matching games. This historical rate is not a prediction of the next game."
+  ]
+}

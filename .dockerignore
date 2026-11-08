@@ -9,3 +9,7 @@ app/test/failures
 collectibles/node_modules
 collectibles/.keys
 collectibles/.env
+
+exports
+website
+.env

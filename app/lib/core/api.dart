@@ -62,12 +62,25 @@ class Api {
     }
   }
 
-  Map<String, String> get _headers => {'Content-Type': 'application/json', if (_token != null) 'Authorization': 'Bearer $_token'};
+  Map<String, String> get _headers => {
+    'Content-Type': 'application/json',
+    if (_token != null) 'Authorization': 'Bearer $_token',
+  };
 
   /// Returns the raw status and body. Network failures become status 0.
-  Future<ApiResponse> raw(String method, String path, {Object? body, Duration? timeout}) async {
-    final effectiveTimeout = timeout ??
-        (path.startsWith('/collectibles/') ? const Duration(seconds: 45) : const Duration(seconds: 12));
+  Future<ApiResponse> raw(
+    String method,
+    String path, {
+    Object? body,
+    Duration? timeout,
+  }) async {
+    final effectiveTimeout =
+        timeout ??
+        (path.startsWith('/analyst/')
+            ? const Duration(seconds: 85)
+            : path.startsWith('/collectibles/')
+            ? const Duration(seconds: 45)
+            : const Duration(seconds: 12));
     final uri = Uri.parse('$base/v1$path');
     if (method != 'GET') _warm.clear();
     try {
@@ -92,15 +105,27 @@ class Api {
     } on TimeoutException {
       return ApiResponse(0, {'code': 'timeout', 'message': 'Checking status…'});
     } catch (_) {
-      return ApiResponse(0, {'code': 'network', 'message': 'You appear to be offline.'});
+      return ApiResponse(0, {
+        'code': 'network',
+        'message': 'You appear to be offline.',
+      });
     }
   }
 
-  Future<Map<String, dynamic>> json(String method, String path, {Object? body}) async {
+  Future<Map<String, dynamic>> json(
+    String method,
+    String path, {
+    Object? body,
+  }) async {
     final r = await raw(method, path, body: body);
     if (r.ok) return r.map;
     final m = r.map;
-    throw ApiException(r.status, m['code']?.toString() ?? 'error', m['message']?.toString() ?? 'Something went wrong.', m);
+    throw ApiException(
+      r.status,
+      m['code']?.toString() ?? 'error',
+      m['message']?.toString() ?? 'Something went wrong.',
+      m,
+    );
   }
 
   final Map<String, (DateTime, Future<ApiResponse>)> _warm = {};
@@ -113,15 +138,18 @@ class Api {
 
   Future<Map<String, dynamic>> get(String path) async {
     final hit = _warm.remove(path);
-    if (hit != null && DateTime.now().difference(hit.$1) < const Duration(seconds: 60)) {
+    if (hit != null &&
+        DateTime.now().difference(hit.$1) < const Duration(seconds: 60)) {
       final r = await hit.$2;
       if (r.ok) return r.map;
     }
     return json('GET', path);
   }
 
-  Future<Map<String, dynamic>> post(String path, [Object? body]) => json('POST', path, body: body ?? {});
-  Future<Map<String, dynamic>> patch(String path, Object body) => json('PATCH', path, body: body);
+  Future<Map<String, dynamic>> post(String path, [Object? body]) =>
+      json('POST', path, body: body ?? {});
+  Future<Map<String, dynamic>> patch(String path, Object body) =>
+      json('PATCH', path, body: body);
 }
 
 final api = Api();

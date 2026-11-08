@@ -104,3 +104,41 @@ error; exact ties remain draws. These matches never award coins or mastery.
 Head-to-heads appear in Social → Messages. Run
 `scripts/test_presentation_head_to_head.py` against an isolated local API/DB for
 admin permissions, frozen lines, invitation access, scoring, and zero coin effects.
+
+### Analyst research
+
+The analyst uses the server-only `GEMINI_API_KEY` (or `GOOGLE_API_KEY`) and
+`GEMINI_ANALYST_MODEL` to interpret questions into validated research plans.
+The currently verified model is `gemini-3-flash-preview`; configure another
+supported model through that variable. No model key is sent to Flutter.
+
+The model cannot issue SQL, execute code, choose network URLs, read account
+records, or invent the statistics shown in a report. Rust reads final official
+box-score revisions from the game database, supplements gaps with historical
+ESPN player game logs or team schedules, and computes the answer and comparison.
+Public source snapshots live in `analyst_source_cache`, separately from the
+markets/settlement tables; on-demand research never grades picks or changes coins.
+
+Supported research dimensions include NFL/NBA player statistics (including NFL
+interceptions and NBA steals, blocks, and turnovers), opponent, home/away,
+season range, regular season/playoffs, team wins/losses, score/margin, rest gaps,
+and threshold frequency. Follow-up questions carry the last three research plans.
+Unsupported conditions ask for clarification instead of being silently ignored.
+Each plan is bounded to 15 seasons, 100 games when a last-N filter is requested,
+and six model questions per user per minute. The last-N limit is applied AFTER
+filters; unbounded cohort analyses use every verified game in the chosen years.
+
+Rest means calendar days between **team** games in `America/New_York`; missed
+player appearances do not become extra rest. The first game without a verified
+prior game in that season is excluded from rest comparisons. Ties count in the
+win/loss denominator. Postseason is excluded unless requested, and unknown/DNP
+stat cells are excluded rather than counted as zero. The UI shows scope, sample
+size, comparison cohort, a paged game log, source links, and caveats. Charts use
+one scale for bars, grid, zero, and threshold; long histories scroll horizontally.
+
+Run `cargo test --workspace` from `backend/`. The opt-in live integration check
+is `python3 scripts/test_analyst_research.py`; it refuses non-local API hosts and
+requires the dedicated test API/catalog (Josh Allen, BUF, BAL, DAL) and Gemini
+key. It checks both example questions, a playoffs follow-up, deduplication,
+source-cache reuse, and calculations. Targeted UI tests are
+`flutter test test/research_chart_test.dart test/research_report_test.dart`.

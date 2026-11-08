@@ -1,0 +1,350 @@
+{
+  "answer": "Dallas Cowboys lost in 2 of 15 matching games (13.3%).",
+  "chart": {
+    "bars": [
+      {
+        "detail": "2/15 games",
+        "label": "Short rest",
+        "value": 13.3
+      },
+      {
+        "detail": "29/56 games",
+        "label": "Other games",
+        "value": 51.8
+      }
+    ],
+    "emphasis": [
+      0
+    ],
+    "label": "Loss rate (%)",
+    "percent": true
+  },
+  "comparison": {
+    "average": 0.4,
+    "games": 56,
+    "hits": 29,
+    "label": "Other games",
+    "rate": 51.8
+  },
+  "dataAsOf": "2026-11-08T15:42:59.912993Z",
+  "definition": "2022\u20132026 \u00b7 regular season \u00b7 0\u20136 days between team games. Filters are applied before taking the most recent N games. Latest official stored box-score revisions are combined with ESPN game logs/schedules and deduplicated by event ID. Missing/DNP statistics are excluded, never treated as zero. Dates shown oldest to latest. Regular season is the default; playoffs are included only when requested. Rest comparisons use complete team schedules, not just player appearances. Calculation: losses divided by all matching games; ties remain in the denominator. This is descriptive history, not a causal claim.",
+  "games": [
+    {
+      "date": "2022-10-02T17:00:00Z",
+      "eventId": "401437751",
+      "home": true,
+      "matched": false,
+      "opponent": "WSH",
+      "pointsAgainst": 10,
+      "pointsFor": 25,
+      "restDays": 6,
+      "result": "W",
+      "source": "espn",
+      "url": "https://www.espn.com/nfl/boxscore/_/gameId/401437751",
+      "value": 15.0
+    },
+    {
+      "date": "2022-11-24T21:30:00Z",
+      "eventId": "401437858",
+      "home": true,
+      "matched": false,
+      "opponent": "NYG",
+      "pointsAgainst": 20,
+      "pointsFor": 28,
+      "restDays": 4,
+      "result": "W",
+      "source": "espn",
+      "url": "https://www.espn.com/nfl/boxscore/_/gameId/401437858",
+      "value": 8.0
+    },
+    {
+      "date": "2022-12-24T21:25:00Z",
+      "eventId": "401437927",
+      "home": true,
+      "matched": false,
+      "opponent": "PHI",
+      "pointsAgainst": 34,
+      "pointsFor": 40,
+      "restDays": 6,
+      "result": "W",
+      "source": "espn",
+      "url": "https://www.espn.com/nfl/boxscore/_/gameId/401437927",
+      "value": 6.0
+    },
+    {
+      "date": "2022-12-30T01:15:00Z",
+      "eventId": "401437932",
+      "home": false,
+      "matched": false,
+      "opponent": "TEN",
+      "pointsAgainst": 13,
+      "pointsFor": 27,
+      "restDays": 5,
+      "result": "W",
+      "source": "espn",
+      "url": "https://www.espn.com/nfl/boxscore/_/gameId/401437932",
+      "value": 14.0
+    },
+    {
+      "date": "2023-11-23T21:30:00Z",
+      "eventId": "401547551",
+      "home": true,
+      "matched": false,
+      "opponent": "WSH",
+      "pointsAgainst": 10,
+      "pointsFor": 45,
+      "restDays": 4,
+      "result": "W",
+      "source": "espn",
+      "url": "https://www.espn.com/nfl/boxscore/_/gameId/401547551",
+      "value": 35.0
+    },
+    {
+      "date": "2023-12-31T01:15:00Z",
+      "eventId": "401547624",
+      "home": true,
+      "matched": false,
+      "opponent": "DET",
+      "pointsAgainst": 19,
+      "pointsFor": 20,
+      "restDays": 6,
+      "result": "W",
+      "source": "espn",
+      "url": "https://www.espn.com/nfl/boxscore/_/gameId/401547624",
+      "value": 1.0
+    },
+    {
+      "date": "2024-09-27T00:15:00Z",
+      "eventId": "401671812",
+      "home": false,
+      "matched": false,
+      "opponent": "NYG",
+      "pointsAgainst": 15,
+      "pointsFor": 20,
+      "restDays": 4,
+      "result": "W",
+      "source": "espn",
+      "url": "https://www.espn.com/nfl/boxscore/_/gameId/401671812",
+      "value": 5.0
+    },
+    {
+      "date": "2024-11-24T18:00:00Z",
+      "eventId": "401671715",
+      "home": false,
+      "matched": false,
+      "opponent": "WSH",
+      "pointsAgainst": 26,
+      "pointsFor": 34,
+      "restDays": 6,
+      "result": "W",
+      "source": "espn",
+      "url": "https://www.espn.com/nfl/boxscore/_/gameId/401671715",
+      "value": 8.0
+    },
+    {
+      "date": "2024-11-28T21:30:00Z",
+      "eventId": "401671779",
+      "home": true,
+      "matched": false,
+      "opponent": "NYG",
+      "pointsAgainst": 20,
+      "pointsFor": 27,
+      "restDays": 4,
+      "result": "W",
+      "source": "espn",
+      "url": "https://www.espn.com/nfl/boxscore/_/gameId/401671779",
+      "value": 7.0
+    },
+    {
+      "date": "2024-12-15T18:00:00Z",
+      "eventId": "401671731",
+      "home": false,
+      "matched": false,
+      "opponent": "CAR",
+      "pointsAgainst": 14,
+      "pointsFor": 30,
+      "restDays": 6,
+      "result": "W",
+      "source": "espn",
+      "url": "https://www.espn.com/nfl/boxscore/_/gameId/401671731",
+      "value": 16.0
+    },
+    {
+      "date": "2025-11-23T21:25:00Z",
+      "eventId": "401772890",
+      "home": true,
+      "matched": false,
+      "opponent": "PHI",
+      "pointsAgainst": 21,
+      "pointsFor": 24,
+      "restDays": 6,
+      "result": "W",
+      "source": "espn",
+      "url": "https://www.espn.com/nfl/boxscore/_/gameId/401772890",
+      "value": 3.0
+    },
+    {
+      "date": "2025-11-27T21:30:00Z",
+      "eventId": "401772694",
+      "home": true,
+      "matched": false,
+      "opponent": "KC",
+      "pointsAgainst": 28,
+      "pointsFor": 31,
+      "restDays": 4,
+      "result": "W",
+      "source": "espn",
+      "url": "https://www.espn.com/nfl/boxscore/_/gameId/401772694",
+      "value": 3.0
+    },
+    {
+      "date": "2025-12-25T18:00:00Z",
+      "eventId": "401772710",
+      "home": false,
+      "matched": false,
+      "opponent": "WSH",
+      "pointsAgainst": 23,
+      "pointsFor": 30,
+      "restDays": 4,
+      "result": "W",
+      "source": "espn",
+      "url": "https://www.espn.com/nfl/boxscore/_/gameId/401772710",
+      "value": 7.0
+    },
+    {
+      "date": "2026-10-09T00:15:00Z",
+      "eventId": "401872980",
+      "home": true,
+      "matched": true,
+      "opponent": "TB",
+      "pointsAgainst": 24,
+      "pointsFor": 16,
+      "restDays": 4,
+      "result": "L",
+      "source": "espn",
+      "url": "https://www.espn.com/nfl/boxscore/_/gameId/401872980",
+      "value": -8.0
+    },
+    {
+      "date": "2026-11-01T18:00:00Z",
+      "eventId": "401873024",
+      "home": true,
+      "matched": true,
+      "opponent": "ARI",
+      "pointsAgainst": 33,
+      "pointsFor": 30,
+      "restDays": 6,
+      "result": "L",
+      "source": "espn",
+      "url": "https://www.espn.com/nfl/boxscore/_/gameId/401873024",
+      "value": -3.0
+    }
+  ],
+  "headline": "2 of 15 games \u00b7 13.3%",
+  "interpretation": "The sample does not support a higher loss rate under this condition. In the other 56 comparable games, the rate was 51.8% (29/56): 38.5 percentage points higher than in the selected games.",
+  "kind": "analysis",
+  "metric": {
+    "average": 7.8,
+    "games": 15,
+    "hits": 2,
+    "rate": 13.3,
+    "threshold": 0.5
+  },
+  "provenance": {
+    "cachedSources": 5,
+    "databaseGames": 0,
+    "fetchedSources": 0,
+    "source": "Sports Swipe database + ESPN historical records"
+  },
+  "range": {
+    "first": "2022-10-02T17:00:00Z",
+    "last": "2026-11-01T18:00:00Z"
+  },
+  "researchPlan": {
+    "clarification": null,
+    "endSeason": 2026,
+    "lastGames": null,
+    "league": "nfl",
+    "measure": "loss_rate",
+    "operator": "gt",
+    "opponent": null,
+    "player": null,
+    "restMax": 6,
+    "restMin": null,
+    "seasonType": "regular",
+    "startSeason": 2022,
+    "stat": "result",
+    "subject": "team",
+    "team": "Dallas Cowboys",
+    "threshold": 0.5,
+    "venue": "any"
+  },
+  "scope": "2022\u20132026 \u00b7 regular season \u00b7 0\u20136 days between team games",
+  "sources": [
+    {
+      "label": "Oct 2, 2022 WSH \u00b7 ESPN box score",
+      "url": "https://www.espn.com/nfl/boxscore/_/gameId/401437751"
+    },
+    {
+      "label": "Nov 24, 2022 NYG \u00b7 ESPN box score",
+      "url": "https://www.espn.com/nfl/boxscore/_/gameId/401437858"
+    },
+    {
+      "label": "Dec 24, 2022 PHI \u00b7 ESPN box score",
+      "url": "https://www.espn.com/nfl/boxscore/_/gameId/401437927"
+    },
+    {
+      "label": "Dec 30, 2022 TEN \u00b7 ESPN box score",
+      "url": "https://www.espn.com/nfl/boxscore/_/gameId/401437932"
+    },
+    {
+      "label": "Nov 23, 2023 WSH \u00b7 ESPN box score",
+      "url": "https://www.espn.com/nfl/boxscore/_/gameId/401547551"
+    },
+    {
+      "label": "Dec 31, 2023 DET \u00b7 ESPN box score",
+      "url": "https://www.espn.com/nfl/boxscore/_/gameId/401547624"
+    },
+    {
+      "label": "Sep 27, 2024 NYG \u00b7 ESPN box score",
+      "url": "https://www.espn.com/nfl/boxscore/_/gameId/401671812"
+    },
+    {
+      "label": "Nov 24, 2024 WSH \u00b7 ESPN box score",
+      "url": "https://www.espn.com/nfl/boxscore/_/gameId/401671715"
+    },
+    {
+      "label": "Nov 28, 2024 NYG \u00b7 ESPN box score",
+      "url": "https://www.espn.com/nfl/boxscore/_/gameId/401671779"
+    },
+    {
+      "label": "Dec 15, 2024 CAR \u00b7 ESPN box score",
+      "url": "https://www.espn.com/nfl/boxscore/_/gameId/401671731"
+    },
+    {
+      "label": "Nov 23, 2025 PHI \u00b7 ESPN box score",
+      "url": "https://www.espn.com/nfl/boxscore/_/gameId/401772890"
+    },
+    {
+      "label": "Nov 27, 2025 KC \u00b7 ESPN box score",
+      "url": "https://www.espn.com/nfl/boxscore/_/gameId/401772694"
+    },
+    {
+      "label": "Dec 25, 2025 WSH \u00b7 ESPN box score",
+      "url": "https://www.espn.com/nfl/boxscore/_/gameId/401772710"
+    },
+    {
+      "label": "Oct 9, 2026 TB \u00b7 ESPN box score",
+      "url": "https://www.espn.com/nfl/boxscore/_/gameId/401872980"
+    },
+    {
+      "label": "Nov 1, 2026 ARI \u00b7 ESPN box score",
+      "url": "https://www.espn.com/nfl/boxscore/_/gameId/401873024"
+    }
+  ],
+  "statLabel": "Game results",
+  "subjectName": "Dallas Cowboys",
+  "warnings": [
+    "Rest is the calendar-day gap between this team's games in America/New_York, not the player's appearances. 5 games without a verified prior team game are excluded from the rest comparison. Opponents, venue and roster changes can also affect results; this does not establish causation."
+  ]
+}

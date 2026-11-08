@@ -1,7 +1,9 @@
-//! Sports analyst. Answers are computed from stored ESPN box scores with an
-//! explicit definition, sample size and sources; nothing is generated or
-//! guessed. Free text is matched to a player and stat, and unsupported
-//! questions get an explicit "insufficient data" answer.
+//! Research analyst: Gemini plans bounded questions, database/ESPN records
+//! supply evidence, and Rust computes every statistic and comparison.
+
+mod data;
+mod plan;
+mod research;
 
 use crate::auth::AuthUser;
 use crate::error::{ApiError, ApiResult};
@@ -27,7 +29,9 @@ async fn suggestions(State(state): State<AppState>, user: AuthUser) -> ApiResult
     let mut seen = std::collections::HashSet::new();
     let mut out = Vec::new();
     for r in rows {
-        if ss_core::lines::is_game_stat(&r.stat_key) { continue; }
+        if ss_core::lines::is_game_stat(&r.stat_key) {
+            continue;
+        }
         if !seen.insert(r.player_id) {
             continue;
         }
@@ -56,8 +60,20 @@ struct FormBody {
     opponent: Option<String>,
 }
 
-async fn form(State(state): State<AppState>, user: AuthUser, Json(b): Json<FormBody>) -> ApiResult<Json<Value>> {
-    let mut report = form_report(&state, user.id, b.player_id, &b.stat_key, b.n.unwrap_or(5), b.opponent.as_deref()).await?;
+async fn form(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Json(b): Json<FormBody>,
+) -> ApiResult<Json<Value>> {
+    let mut report = form_report(
+        &state,
+        user.id,
+        b.player_id,
+        &b.stat_key,
+        b.n.unwrap_or(5),
+        b.opponent.as_deref(),
+    )
+    .await?;
     attach_share(&state, user.id, &mut report).await?;
     Ok(Json(report))
 }
@@ -71,10 +87,11 @@ async fn form_report(
     opponent: Option<&str>,
 ) -> ApiResult<Value> {
     let n = n.clamp(1, 20);
-    let stat: Option<(String, String)> = sqlx::query_as("SELECT label, league FROM stat_definitions WHERE key = $1")
-        .bind(stat_key)
-        .fetch_optional(&state.pool)
-        .await?;
+    let stat: Option<(String, String)> =
+        sqlx::query_as("SELECT label, league FROM stat_definitions WHERE key = $1")
+            .bind(stat_key)
+            .fetch_optional(&state.pool)
+            .await?;
     let (stat_label, league) = stat.ok_or_else(|| ApiError::BadRequest("Unknown stat.".into()))?;
     let specs = ss_db::cards::card_specs(&state.pool, &[player_id]).await?;
     let card = specs.get(&player_id).cloned().ok_or(ApiError::NotFound)?;
@@ -87,10 +104,11 @@ async fn form_report(
         let skip = games.len().saturating_sub(n as usize);
         games.drain(..skip);
     }
-    let espn_ids: Vec<(i64, String)> = sqlx::query_as("SELECT id, espn_id FROM games WHERE id = ANY($1)")
-        .bind(games.iter().map(|g| g.game_id).collect::<Vec<_>>())
-        .fetch_all(&state.pool)
-        .await?;
+    let espn_ids: Vec<(i64, String)> =
+        sqlx::query_as("SELECT id, espn_id FROM games WHERE id = ANY($1)")
+            .bind(games.iter().map(|g| g.game_id).collect::<Vec<_>>())
+            .fetch_all(&state.pool)
+            .await?;
 
     // The current open line for this player and stat, if any, plus a playable card.
     let market: Option<i64> = sqlx::query_scalar(
@@ -102,22 +120,55 @@ async fn form_report(
     .fetch_optional(&state.pool)
     .await?;
     let playable = match market {
-        Some(m) => ss_db::cards::playable_cards(&state.pool, Some(user_id), &[m]).await?.into_iter().next(),
+        Some(m) => ss_db::cards::playable_cards(&state.pool, Some(user_id), &[m])
+            .await?
+            .into_iter()
+            .next(),
         None => None,
     };
     let already_picked: Option<uuid::Uuid> = match market {
-        Some(m) => sqlx::query_scalar("SELECT id FROM entries WHERE user_id = $1 AND single_market_id = $2")
+        Some(m) => {
+            sqlx::query_scalar(
+                "SELECT id FROM entries WHERE user_id = $1 AND single_market_id = $2",
+            )
             .bind(user_id)
             .bind(m)
             .fetch_optional(&state.pool)
-            .await?,
+            .await?
+        }
         None => None,
     };
     let line = playable.as_ref().and_then(|p| p["market"]["line"].as_f64());
-    let values: Vec<f64> = games.iter().map(|g| ss_db::x10_to_f64(g.value_x10)).collect();
-    let name = card["fullName"].as_str().unwrap_or("This player").to_string();
-    let vs = opponent.map(|o| format!(" against {o}")).unwrap_or_default();
+    let values: Vec<f64> = games
+        .iter()
+        .map(|g| ss_db::x10_to_f64(g.value_x10))
+        .collect();
+    let name = card["fullName"]
+        .as_str()
+        .unwrap_or("This player")
+        .to_string();
+    let vs = opponent
+        .map(|o| format!(" against {o}"))
+        .unwrap_or_default();
 
+    if values.len() < n as usize {
+        match research::fill_form(state, player_id, stat_key, n, opponent).await {
+            Ok(mut enriched) if enriched["kind"] == "analysis" => {
+                enriched["card"] = card;
+                enriched["playable"] = json!(playable);
+                enriched["alreadyPickedEntryId"] = json!(already_picked);
+                return Ok(enriched);
+            }
+            Ok(note) if values.is_empty() => return Ok(note),
+            Err(error) if values.is_empty() => {
+                tracing::warn!(%error, "recent-form enrichment unavailable");
+                return Ok(
+                    json!({"kind":"research_note","answer":"I couldn't verify the historical game log right now. Please try this question again shortly.","playable":playable}),
+                );
+            }
+            _ => {}
+        }
+    }
     if values.is_empty() {
         return Ok(json!({
             "kind": "insufficient_data", "card": card, "statLabel": stat_label,
@@ -132,9 +183,17 @@ async fn form_report(
     let answer = match (line, above) {
         (Some(l), Some(a)) => format!(
             "{name} went over {l} {} in {a} of his last {} games{vs} ({}%). The average is {:.1}.",
-            stat_label.to_lowercase(), values.len(), (a as f64 * 100.0 / values.len() as f64).round(), avg
+            stat_label.to_lowercase(),
+            values.len(),
+            (a as f64 * 100.0 / values.len() as f64).round(),
+            avg
         ),
-        _ => format!("{name} averaged {:.1} {} over his last {} games{vs}.", avg, stat_label.to_lowercase(), values.len()),
+        _ => format!(
+            "{name} averaged {:.1} {} over his last {} games{vs}.",
+            avg,
+            stat_label.to_lowercase(),
+            values.len()
+        ),
     };
     let sport = if league == "nfl" { "nfl" } else { "nba" };
     Ok(json!({
@@ -162,112 +221,49 @@ async fn form_report(
     }))
 }
 
-/// Keyword to stat key, checked in order so "passing yards" wins over "yards".
-const STAT_WORDS: &[(&str, &str)] = &[
-    ("passing yard", "pass_yds"), ("pass yard", "pass_yds"), ("passing td", "pass_td"), ("passing touchdown", "pass_td"),
-    ("rushing yard", "rush_yds"), ("rush yard", "rush_yds"), ("receiving yard", "rec_yds"), ("rec yard", "rec_yds"),
-    ("reception", "rec"), ("catches", "rec"), ("rebound", "reb"), ("assist", "ast"), ("three", "fg3m"),
-    ("3-point", "fg3m"), ("3 point", "fg3m"), ("3pt", "fg3m"), ("point", "pts"), ("scor", "pts"),
-];
-
-const UNSUPPORTED_WORDS: &[&str] = &["interception", "sack", "fumble", "steal", "block", "turnover", "tackle", "field goal %"];
-
 #[derive(Deserialize)]
 struct AskBody {
     question: String,
+    #[serde(default)]
+    context: Vec<Value>,
 }
 
-async fn ask(State(state): State<AppState>, user: AuthUser, Json(b): Json<AskBody>) -> ApiResult<Json<Value>> {
-    let q = b.question.trim().to_lowercase();
-    if q.len() < 3 || q.len() > 300 {
-        return Err(ApiError::BadRequest("Ask a question about an NFL or NBA player.".into()));
+async fn ask(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Json(b): Json<AskBody>,
+) -> ApiResult<Json<Value>> {
+    let question = b.question.trim();
+    if question.len() < 3 || question.len() > 700 {
+        return Err(ApiError::BadRequest(
+            "Ask a question of 3–700 characters.".into(),
+        ));
     }
-    // Longest player name contained in the question, falling back to a unique last name.
-    let players: Vec<(i64, String, String, String, Option<String>)> = sqlx::query_as(
-        r#"SELECT id, full_name, last_name, league, position FROM players
-           WHERE active AND (position(lower(full_name) in $1) > 0 OR position(lower(last_name) in $1) > 0)
-           ORDER BY (position(lower(full_name) in $1) > 0) DESC, length(full_name) DESC LIMIT 10"#,
-    )
-    .bind(&q)
-    .fetch_all(&state.pool)
-    .await?;
-    let full: Vec<_> = players.iter().filter(|p| q.contains(&p.1.to_lowercase())).collect();
-    let player = match full.first() {
-        Some(p) => Some(*p),
-        None => {
-            let by_last: Vec<_> = players.iter().filter(|p| p.2.len() >= 4 && q.contains(&p.2.to_lowercase())).collect();
-            if by_last.len() == 1 { Some(by_last[0]) } else { None }
-        }
-    };
-    let Some((player_id, full_name, _, league, position)) = player.cloned() else {
-        return Ok(Json(json!({
-            "kind": "unmatched",
-            "answer": "I couldn't match that to a current NFL or NBA player. Try a full name, like \"Josh Allen passing yards last 5 games\".",
-        })));
-    };
-    if let Some(word) = UNSUPPORTED_WORDS.iter().find(|w| q.contains(*w)) {
-        return Ok(Json(json!({
-            "kind": "insufficient_data",
-            "answer": format!("{word}s for {full_name} aren't in our verified data yet. Supported stats: passing, rushing and receiving yards, receptions, passing TDs, points, rebounds, assists and 3-pointers.",
-                word = word.trim_end_matches('s')),
-        })));
-    }
-    let stat_key = STAT_WORDS.iter().find(|(w, _)| q.contains(w)).map(|(_, k)| *k).unwrap_or_else(|| {
-        match (league.as_str(), position.as_deref()) {
-            ("nba", _) => "pts",
-            (_, Some("QB")) => "pass_yds",
-            (_, Some("RB")) => "rush_yds",
-            _ => "rec_yds",
-        }
-    });
-    let stat_league: Option<String> = sqlx::query_scalar("SELECT league FROM stat_definitions WHERE key = $1")
-        .bind(stat_key)
-        .fetch_optional(&state.pool)
-        .await?;
-    if stat_league.as_deref() != Some(league.as_str()) {
-        return Ok(Json(json!({ "kind": "insufficient_data", "answer": format!("That stat doesn't apply to {full_name}.") })));
-    }
-    let n = q.split_once("last ").and_then(|(_, rest)| rest.split_whitespace().next())
-        .and_then(|n| n.parse::<i64>().ok()).unwrap_or(5).clamp(1,20);
-    // "against X" / "vs X": match an opponent by team name, location or abbreviation.
-    let opponent = match q.split_once(" against ").or_else(|| q.split_once(" vs ")).or_else(|| q.split_once(" versus ")) {
-        Some((_, rest)) => {
-            let rest = rest.trim().trim_end_matches('?');
-            sqlx::query_scalar::<_, String>(
-                r#"SELECT abbr FROM teams WHERE league = $1 AND (
-                     position(lower(short_name) in $2) > 0 OR position(lower(location) in $2) > 0 OR lower(abbr) = split_part($2, ' ', 1))
-                   LIMIT 1"#,
-            )
-            .bind(&league)
-            .bind(rest)
-            .fetch_optional(&state.pool)
-            .await?
-        }
-        None => None,
-    };
-    let mut report = form_report(&state, user.id, player_id, stat_key, n, opponent.as_deref()).await?;
-    report["focus"] = json!(if ["clear", "over ", "above", "how often"].iter().any(|w| q.contains(w)) { "line" } else { "form" });
-    if report["kind"] == "form" && report["focus"] == "line" {
-        let threshold = ["cleared ", "clear ", "over ", "above "].iter()
-            .find_map(|word|q.split_once(word).and_then(|(_,rest)|rest.split_whitespace().next())
-                .and_then(|n|n.trim_end_matches('?').parse::<f64>().ok())).filter(|n|n.is_finite());
-        if let Some(line) = threshold {
-            let above = report["games"].as_array().unwrap().iter().filter(|g|g["value"].as_f64().unwrap_or(0.0)>line).count();
-            report["metric"]["requestedLine"] = json!(line);
-            report["metric"]["aboveRequestedLine"] = json!(above);
-        }
-    }
-    attach_share(&state,user.id,&mut report).await?;
+    let history: Vec<Value> = b
+        .context
+        .into_iter()
+        .rev()
+        .take(3)
+        .filter(|v| v.to_string().len() <= 3500)
+        .collect::<Vec<_>>()
+        .into_iter()
+        .rev()
+        .collect();
+    let mut report = research::answer(&state, user.id, question, &history).await?;
+    attach_share(&state, user.id, &mut report).await?;
     Ok(Json(report))
 }
 
 async fn attach_share(state: &AppState, user: uuid::Uuid, report: &mut Value) -> ApiResult<()> {
-    if report["kind"] == "form" {
+    if report["kind"] == "form" || report["kind"] == "analysis" {
         let mut snapshot = report.clone();
         // Public box-score research carries no private pick or wager state.
-        snapshot.as_object_mut().unwrap().remove("alreadyPickedEntryId");
+        snapshot
+            .as_object_mut()
+            .unwrap()
+            .remove("alreadyPickedEntryId");
         snapshot.as_object_mut().unwrap().remove("playable");
-        let id = crate::shares::save(state,user,"research",snapshot).await?;
+        let id = crate::shares::save(state, user, "research", snapshot).await?;
         report["shareId"] = json!(id);
     }
     Ok(())

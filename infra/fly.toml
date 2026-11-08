@@ -17,6 +17,7 @@ primary_region = "iad"
   COOKIE_SECURE = "true"
   API_DB_POOL = "10"
   WORKER_DB_POOL = "5"
+  GEMINI_ANALYST_MODEL = "gemini-3-flash-preview"
 
 [processes]
   app = "api"
