@@ -296,7 +296,7 @@ class _ProfileTabState extends ConsumerState<_ProfileTab> {
     if (me == null) return const Loading();
     if (_forUser != me.id) {
       _forUser = me.id;
-      _stats = api.get('/profiles/${me.id}/stats');
+      _stats = _loadProfileData(me.id);
     }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -335,7 +335,7 @@ class _ProfileTabState extends ConsumerState<_ProfileTab> {
           builder: (context, snap) {
             if (snap.hasError) return ErrorText(snap.error!);
             if (!snap.hasData) return const Loading();
-            return StatsBlock(snap.data!);
+            return StatsBlock(snap.data!.$1, topCards: snap.data!.$2);
           },
         ),
         const Hr(v: 22),

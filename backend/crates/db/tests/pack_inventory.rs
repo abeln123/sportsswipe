@@ -116,3 +116,36 @@ async fn concurrent_packs_never_share_cards(pool: PgPool) {
             .unwrap();
     assert_eq!((total, unique), (10, 10));
 }
+
+#[sqlx::test(migrations = "./migrations")]
+#[ignore = "requires local PostgreSQL; run with DATABASE_URL and --ignored"]
+async fn early_kickoff_locks_only_its_game_later_picks_and_packs_stay_open(pool: PgPool) {
+    use ss_db::{picks::{self, EntryKind, LegRequest}, slate};
+    use ss_core::Side;
+    let (user, _) = fixture(&pool).await;
+    let early: i64 = sqlx::query_scalar("SELECT id FROM games WHERE espn_id='test-game'").fetch_one(&pool).await.unwrap();
+    let later: i64 = sqlx::query_scalar("INSERT INTO games(league,espn_id,season,home_team_id,away_team_id,start_at) SELECT league,'later-game',season,home_team_id,away_team_id,now()+interval '3 hours' FROM games WHERE id=$1 RETURNING id").bind(early).fetch_one(&pool).await.unwrap();
+    sqlx::query("UPDATE markets SET game_id=$2,lock_at=now()+interval '3 hours' WHERE id IN(SELECT id FROM markets WHERE game_id=$1 ORDER BY id OFFSET 5)").bind(early).bind(later).execute(&pool).await.unwrap();
+    sqlx::query("UPDATE games SET start_at=now()-interval '1 minute',status='in' WHERE id=$1").bind(early).execute(&pool).await.unwrap();
+    sqlx::query("UPDATE markets SET lock_at=now()-interval '1 minute' WHERE game_id=$1").bind(early).execute(&pool).await.unwrap();
+    assert_eq!(slate::lock_due_markets(&pool).await.unwrap(),5);
+    let early_market: i64 = sqlx::query_scalar("SELECT min(id) FROM markets WHERE game_id=$1").bind(early).fetch_one(&pool).await.unwrap();
+    let late_markets: Vec<i64> = sqlx::query_scalar("SELECT id FROM markets WHERE game_id=$1 ORDER BY id").bind(later).fetch_all(&pool).await.unwrap();
+    let leg=|market_id|LegRequest{market_id,line_version:1,side:Side::Over};
+    let blocked=picks::accept_entry(&pool,user,Uuid::new_v4(),EntryKind::Single,25,vec![leg(early_market)],None).await.unwrap();
+    assert_eq!(blocked.http_status,409);
+    assert_eq!(blocked.body["code"],"pick_closed");
+    let starter=packs::pack_types(&pool).await.unwrap().into_iter().find(|p|p.key=="starter").unwrap();
+    assert_eq!(packs::available(&pool,user,&starter,None).await.unwrap(),16);
+    let accepted=picks::accept_entry(&pool,user,Uuid::new_v4(),EntryKind::Single,0,vec![leg(late_markets[0])],None).await.unwrap();
+    assert_eq!(accepted.http_status,201);
+    let parlay=picks::accept_entry(&pool,user,Uuid::new_v4(),EntryKind::Parlay,0,vec![leg(late_markets[1]),leg(late_markets[2])],None).await.unwrap();
+    assert_eq!(parlay.http_status,201);
+    let pack=packs::buy(&pool,user,Uuid::new_v4(),"starter",None).await.unwrap();
+    assert_eq!(pack.http_status,201);
+    let dealt: Vec<i64>=sqlx::query_scalar("SELECT DISTINCT m.game_id FROM pack_cards pc JOIN markets m ON m.id=pc.market_id").fetch_all(&pool).await.unwrap();
+    assert_eq!(dealt,vec![later]);
+    let early_locked: i64=sqlx::query_scalar("SELECT count(*) FROM markets WHERE game_id=$1 AND status='locked'").bind(early).fetch_one(&pool).await.unwrap();
+    let later_open: i64=sqlx::query_scalar("SELECT count(*) FROM markets WHERE game_id=$1 AND status='open'").bind(later).fetch_one(&pool).await.unwrap();
+    assert_eq!((early_locked,later_open),(5,16));
+}
