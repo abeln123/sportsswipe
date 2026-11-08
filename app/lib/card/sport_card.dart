@@ -18,6 +18,16 @@ class Finish {
     _ => const [Color(0xFFF7F9FB), Color(0xFFC6CED6), Color(0xFFEFF3F6)],
   };
 
+  static String collectionFinish(String equipped, String tier) =>
+      equipped == 'base' && const ['bronze', 'silver', 'gold', 'diamond'].contains(tier) ? tier : equipped;
+
+  static List<Color> face(String finish) => switch (finish) {
+    'diamond' => const [Color(0xFFD9EDFF), Color(0xFFF7FCFF), Color(0xFFE3D8F5), Color(0xFFDCF7FA)],
+    'gold' => const [Color(0xFFFFF1CD), Color(0xFFFFF9EA), Color(0xFFEEDDB1)],
+    'bronze' => const [Color(0xFFF6E1CF), Color(0xFFFFF7EF), Color(0xFFE9CEB8)],
+    _ => const [Color(0xFFF8FAFC), Color(0xFFE9EEF2), Color(0xFFF3F6F8)],
+  };
+
   static Color accent(String finish) => switch (finish) {
     'bronze' => const Color(0xFFB8733F),
     'silver' => const Color(0xFF8E9AA6),
@@ -41,6 +51,8 @@ class SportCard extends StatelessWidget {
     this.body,
     this.footer,
     this.width = 340,
+    this.showShare = true,
+    this.onShare,
   });
 
   final CardSpec spec;
@@ -52,6 +64,8 @@ class SportCard extends StatelessWidget {
   final Widget? body;
   final Widget? footer;
   final double width;
+  final bool showShare;
+  final VoidCallback? onShare;
 
   @override
   Widget build(BuildContext context) {
@@ -64,16 +78,12 @@ class SportCard extends StatelessWidget {
         gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: Finish.frame(finish)),
         boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.45), blurRadius: 18 * s, offset: Offset(0, 8 * s))],
       ),
-      padding: EdgeInsets.all(3 * s),
+      padding: EdgeInsets.all((finish == 'diamond' ? 5 : 3) * s),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(13 * s),
         child: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [Color(0xFFF8FAFC), Color(0xFFE9EEF2), Color(0xFFF3F6F8)],
-            ),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: Finish.face(finish)),
           ),
           child: DefaultTextStyle(
             style: const TextStyle(color: C.ink, fontFamily: 'Inter'),
@@ -84,7 +94,17 @@ class SportCard extends StatelessWidget {
                 _topBar(s),
                 SizedBox(
                   height: heroHeight,
-                  child: _Hero(spec: spec, scale: s),
+                  child: Stack(
+                    children: [
+                      Positioned.fill(
+                        child: _Hero(spec: spec, scale: s),
+                      ),
+                      if (finish == 'diamond')
+                        const Positioned.fill(
+                          child: IgnorePointer(child: CustomPaint(painter: _DiamondFacets())),
+                        ),
+                    ],
+                  ),
                 ),
                 Container(height: 1.5 * s, color: spec.colorway.base.withValues(alpha: 0.35)),
                 Padding(
@@ -121,13 +141,14 @@ class SportCard extends StatelessWidget {
                       child:
                           footer ?? CardFooter(spec: spec, scale: s, finish: finish, left: finish.toUpperCase(), right: 'Earn Base: 0/1'),
                     ),
-                    IconButton(
-                      tooltip: 'Share card and start a head-to-head',
-                      onPressed: () => challengeShare(context, card: spec, marketId: market?.marketId),
-                      icon: Icon(Icons.near_me_outlined, size: 18 * s, color: C.ink),
-                      constraints: const BoxConstraints(minWidth: 40, minHeight: 44),
-                      padding: const EdgeInsets.all(8),
-                    ),
+                    if (showShare)
+                      IconButton(
+                        tooltip: 'Share card and start a head-to-head',
+                        onPressed: onShare ?? () => challengeShare(context, card: spec, marketId: market?.marketId),
+                        icon: Icon(Icons.near_me_outlined, size: 18 * s, color: C.ink),
+                        constraints: const BoxConstraints(minWidth: 40, minHeight: 44),
+                        padding: const EdgeInsets.all(8),
+                      ),
                   ],
                 ),
               ],
@@ -159,6 +180,7 @@ class SportCard extends StatelessWidget {
             style: TextStyle(fontSize: 12 * s, fontWeight: FontWeight.w800, letterSpacing: 1.2, color: C.ink),
           ),
           const Spacer(),
+          if (finish == 'diamond') ...[Icon(Icons.diamond_outlined, size: 16 * s, color: const Color(0xFF6657A5)), SizedBox(width: 5 * s)],
           if (topRight != null)
             Text(
               topRight!,
@@ -168,6 +190,54 @@ class SportCard extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Printed prismatic facets, kept static so the card remains cheap to move.
+class _DiamondFacets extends CustomPainter {
+  const _DiamondFacets();
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width, h = size.height;
+    final facets = [
+      (
+        Path()
+          ..moveTo(0, h)
+          ..lineTo(w * .42, 0)
+          ..lineTo(w * .67, 0)
+          ..lineTo(w * .2, h)
+          ..close(),
+        const Color(0xFFB1E7FF),
+      ),
+      (
+        Path()
+          ..moveTo(w * .7, 0)
+          ..lineTo(w, h * .2)
+          ..lineTo(w * .55, h)
+          ..lineTo(w * .38, h)
+          ..close(),
+        const Color(0xFFE6BCFF),
+      ),
+    ];
+    for (final (path, color) in facets) {
+      canvas.drawPath(
+        path,
+        Paint()
+          ..shader = LinearGradient(
+            colors: [color.withValues(alpha: .28), Colors.white.withValues(alpha: .08), color.withValues(alpha: .18)],
+          ).createShader(Offset.zero & size),
+      );
+    }
+    canvas.drawLine(
+      Offset(w * .42, 0),
+      Offset(0, h),
+      Paint()
+        ..color = Colors.white.withValues(alpha: .5)
+        ..strokeWidth = 1,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_DiamondFacets old) => false;
 }
 
 class _Hero extends StatelessWidget {
@@ -610,6 +680,7 @@ class CardTile extends StatelessWidget {
     return SportCard(
       spec: spec,
       variant: CardVariant.tile,
+      showShare: false,
       width: width,
       finish: finish,
       topRight: f.two(spec.cardNo),

@@ -7,7 +7,7 @@ import{DEVNET_GENESIS}from'../src/policy.mjs';
 const base=process.env.DEMO_API_URL||'http://localhost:8090';assert.ok(['localhost','127.0.0.1'].includes(new URL(base).hostname));
 async function api(path,body,token){const r=await fetch(`${base}/v1${path}`,{method:body?'POST':'GET',headers:{'content-type':'application/json',...(token?{authorization:`Bearer ${token}`}:{})},...(body?{body:JSON.stringify(body)}:{})});const j=await r.json();if(!r.ok)throw new Error(`${r.status} ${j.message}`);return j;}
 const user=await api('/auth/login',{email:process.env.PRESENTATION_ADMIN_EMAIL,password:'milestone-pass-123'});assert.ok(user.isAdmin);
-const token=user.sessionToken;const pack=await api('/admin/presentation-pack',{},token);const player=pack.cards[0].card.playerId;
+const token=user.sessionToken;const owned=await api('/me/collection',null,token);const player=owned.cards.find(c=>c.presentation&&c.mastery.count>=400).card.playerId;
 const path='collectibles/.keys/presentation-admin.json';if(!existsSync(path))writeFileSync(path,JSON.stringify([...Keypair.generate().secretKey]),{mode:0o600,flag:'wx'});
 const admin=Keypair.fromSecretKey(Uint8Array.from(JSON.parse(readFileSync(path,'utf8'))));
 const issuer=Keypair.fromSecretKey(Uint8Array.from(JSON.parse(readFileSync(process.env.SOLANA_ISSUER_KEYPAIR,'utf8'))));

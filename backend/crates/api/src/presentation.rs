@@ -1,19 +1,8 @@
 //! Repeatable, explicitly synthetic judging pack. Every entry point requires admin.
-use crate::{auth::{AdminUser, AuthUser}, error::ApiResult, state::AppState};
-use axum::{extract::State, routing::post, Json, Router};
-use serde_json::{json, Value};
-pub fn routes() -> Router<AppState> {
-    Router::new().route("/admin/presentation-pack", post(open))
-}
-async fn open(State(state): State<AppState>, AdminUser(admin): AdminUser) -> ApiResult<Json<Value>> {
-    let ids = provision(&state, admin).await?;
-    let cards = ss_db::cards::playable_cards(&state.pool, Some(admin.id), &ids).await?;
-    Ok(Json(json!({"cards":cards,"name":"Presentation Pack","presentation":true})))
-}
+use crate::{auth::AuthUser, error::ApiResult, state::AppState};
 
 /// Only server-verified admins receive synthetic demo progress.
-/// Called on collection/catalog entry as well as opening the pack, so the
-/// presentation Diamond is ready before the judge visits the collection.
+/// The admin demo Diamond remains in the collection independently of packs.
 pub async fn ensure(state: &AppState, user: AuthUser) -> ApiResult<()> {
     if !user.is_admin { return Ok(()); }
     let ready: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM presentation_entitlements pe JOIN mastery_totals mt ON mt.user_id=pe.user_id AND mt.player_id=pe.player_id JOIN equipped_finishes ef ON ef.user_id=pe.user_id AND ef.player_id=pe.player_id WHERE pe.user_id=$1 AND mt.correct_count>=400 AND ef.finish='diamond') AND (SELECT count(*) FROM presentation_cards pc JOIN mastery_totals mt ON mt.player_id=pc.player_id WHERE mt.user_id=$1)=5")

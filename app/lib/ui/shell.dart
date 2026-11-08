@@ -103,6 +103,7 @@ class AppHeader extends ConsumerWidget {
     final balance = ref.watch(displayBalanceProvider);
     final loaded = ref.watch(summaryProvider).loaded;
     final mode = ref.watch(playModeProvider);
+    final cards = ref.watch(playCardsProvider);
     final open = ref.watch(playMenuProvider);
     void toggle() => ref.read(playMenuProvider.notifier).toggle();
     return SizedBox(
@@ -111,7 +112,8 @@ class AppHeader extends ConsumerWidget {
         padding: EdgeInsets.only(left: play ? 8 : 16, right: 16),
         child: Row(
           children: [
-            if (play)
+            if (play && !cards) const Text('Play', style: T.h2),
+            if (play && cards)
               Semantics(
                 button: true,
                 expanded: open,

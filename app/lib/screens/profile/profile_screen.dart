@@ -291,7 +291,7 @@ class _CollectionTab extends StatefulWidget {
 class _CollectionTabState extends State<_CollectionTab> {
   late Future<Map<String, dynamic>> _data = api.get('/me/collection');
 
-  Future<void> _equip(Map<String, dynamic> c, List<Map<String, dynamic>> unassigned) async {
+  Future<String?> _equip(Map<String, dynamic> c, List<Map<String, dynamic>> unassigned) async {
     final spec = CardSpec.fromJson((c['card'] as Map).cast<String, dynamic>());
     final current = c['finish'] as String;
     final options = ['base', ...unassigned.map((u) => u['finish'] as String)];
@@ -327,8 +327,8 @@ class _CollectionTabState extends State<_CollectionTab> {
           for (final o in options)
             ListTile(
               contentPadding: EdgeInsets.zero,
-              title: Text(f.cap(o)),
-              subtitle: Text(o == 'base' ? 'Default chrome' : 'Owned finish', style: T.small),
+              title: Text(o == 'base' ? 'Earned ${f.cap(c['mastery']['tier'] as String)}' : f.cap(o)),
+              subtitle: Text(o == 'base' ? 'Follow your mastery tier' : 'Owned finish', style: T.small),
               trailing: o == current ? const Icon(Icons.check, color: C.green) : null,
               onTap: () => Navigator.pop(ctx, o),
             ),
@@ -337,20 +337,23 @@ class _CollectionTabState extends State<_CollectionTab> {
               'Buy finishes in the store',
               onTap: () {
                 Navigator.pop(ctx);
+                Navigator.pop(context);
                 widget.onStore();
               },
             ),
         ],
       ),
     );
-    if (choice == null || choice == current) return;
+    if (choice == null || choice == current) return null;
     try {
       await api.post('/me/collection/${spec.playerId}/equip', {'finish': choice});
       setState(() {
         _data = api.get('/me/collection');
       });
+      return choice;
     } on ApiException catch (e) {
       if (mounted) toast(context, e.message, ok: false);
+      return null;
     }
   }
 
@@ -360,7 +363,7 @@ class _CollectionTabState extends State<_CollectionTab> {
       future: _data,
       builder: (context, snap) {
         if (snap.hasError) return ErrorText(snap.error!);
-        if (!snap.hasData) return const Loading();
+        if (!snap.hasData) return const SizedBox(height: 360, child: Loading());
         final d = snap.data!;
         final cards = (d['cards'] as List).cast<Map<String, dynamic>>();
         final unassigned = (d['unassignedFinishes'] as List).cast<Map<String, dynamic>>();
@@ -444,7 +447,7 @@ class _CollectionTabState extends State<_CollectionTab> {
             const SizedBox(height: 8),
             const Text(
               'Earn a player\'s Base card with your first correct call. Keep getting that player right to reach Bronze, '
-              'Silver, Gold, and Diamond. Store finishes change appearance only. Cards never redeem for money.',
+              'Silver, Gold, and Diamond. Earned tiers change your card’s appearance. Store finishes let you customize it. Cards never redeem for money.',
               style: T.dim,
             ),
             Container(height: 2, color: C.green, margin: const EdgeInsets.symmetric(vertical: 18)),
@@ -463,12 +466,17 @@ class _CollectionTabState extends State<_CollectionTab> {
                   children: [
                     for (final card in cards)
                       GestureDetector(
-                        onTap: () => _equip(card, unassigned),
+                        onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            fullscreenDialog: true,
+                            builder: (_) => CollectionCardView(data: card, onCustomize: () => _equip(card, unassigned)),
+                          ),
+                        ),
                         child: CardTile(
                           spec: CardSpec.fromJson((card['card'] as Map).cast<String, dynamic>()),
                           width: w,
-                          finish: card['finish'] as String,
-                          tierLabel: card['finish'] == 'base' ? 'Base' : f.cap(card['finish'] as String),
+                          finish: Finish.collectionFinish(card['finish'] as String, card['mastery']['tier'] as String),
+                          tierLabel: f.cap(card['mastery']['tier'] as String),
                           progress: _progress(Mastery.fromJson((card['mastery'] as Map).cast<String, dynamic>())),
                         ),
                       ),
@@ -492,6 +500,94 @@ class _CollectionTabState extends State<_CollectionTab> {
   String _progress(Mastery m) => m.nextTier == null
       ? 'Mastery: ${f.cap(m.tier)} · ${m.count} correct'
       : 'Mastery: ${f.cap(m.displayTier)} · ${m.count} / ${m.nextAt} to ${f.cap(m.nextTier!)}';
+}
+
+/// A collection card opens as its own screen, with actions in thumb reach.
+class CollectionCardView extends StatefulWidget {
+  const CollectionCardView({super.key, required this.data, required this.onCustomize});
+  final Map<String, dynamic> data;
+  final Future<String?> Function() onCustomize;
+  @override
+  State<CollectionCardView> createState() => _CollectionCardViewState();
+}
+
+class _CollectionCardViewState extends State<CollectionCardView> {
+  late String _equipped = widget.data['finish'] as String;
+  @override
+  Widget build(BuildContext context) {
+    final spec = CardSpec.fromJson((widget.data['card'] as Map).cast<String, dynamic>());
+    final mastery = Mastery.fromJson((widget.data['mastery'] as Map).cast<String, dynamic>());
+    final finish = Finish.collectionFinish(_equipped, mastery.tier);
+    final demo = widget.data['presentation'] == true;
+    void share() => shareObject(context, source: {'kind': 'card', 'playerId': spec.playerId});
+    return Scaffold(
+      appBar: AppBar(
+        backgroundColor: C.bg,
+        title: const Text('Collection', style: T.h3),
+      ),
+      body: SafeArea(
+        child: LayoutBuilder(
+          builder: (context, box) => SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text('${mastery.tier.toUpperCase()} · ${spec.series.toUpperCase()}', style: T.label),
+                const SizedBox(height: 16),
+                Center(
+                  child: RepaintBoundary(
+                    child: SportCard(
+                      spec: spec,
+                      width: math.min(box.maxWidth - 40, 380),
+                      finish: finish,
+                      onShare: share,
+                      topRight: finish.toUpperCase(),
+                      body: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 18),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('${mastery.count} correct calls', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+                            const SizedBox(height: 6),
+                            Text(
+                              mastery.nextTier == null
+                                  ? 'Diamond mastery unlocked'
+                                  : '${mastery.count} / ${mastery.nextAt} to ${f.cap(mastery.nextTier!)}',
+                              style: const TextStyle(color: C.inkDim),
+                            ),
+                          ],
+                        ),
+                      ),
+                      footer: CardFooter(
+                        spec: spec,
+                        finish: finish,
+                        left: mastery.tier.toUpperCase(),
+                        right: mastery.nextTier == null ? '400/400 · Unlocked' : '${mastery.count} correct',
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 22),
+                OutlinedButton.icon(onPressed: share, icon: const Icon(Icons.ios_share, size: 18), label: const Text('Share card')),
+                if (mastery.count >= 400) ...[
+                  const SizedBox(height: 10),
+                  PrimaryButton('Sell Diamond edition', onPressed: () => context.go('/profile/sell/${spec.playerId}?presentation=$demo')),
+                ],
+                TextButton(
+                  onPressed: () async {
+                    final choice = await widget.onCustomize();
+                    if (choice != null && mounted) setState(() => _equipped = choice);
+                  },
+                  child: const Text('Change card finish'),
+                ),
+                if (demo) const Text('ADMIN DEMO · 400/400 grant · Devnet collectible', style: T.small, textAlign: TextAlign.center),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _StoreTab extends ConsumerStatefulWidget {

@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+import '../../state/session.dart';
 
 import '../../core/theme.dart';
 import '../../state/play.dart';
+import '../../ui/widgets.dart';
 import 'contest_hub.dart';
 import 'pack_store.dart';
 import 'parlay_deck.dart';
@@ -16,12 +20,7 @@ class PlayScreen extends ConsumerStatefulWidget {
 }
 
 class _PlayScreenState extends ConsumerState<PlayScreen> with SingleTickerProviderStateMixin {
-  /// 0 closed, 1 open. Follows the finger while the card is pulled down.
-  late final AnimationController _menu = AnimationController(vsync: this, duration: const Duration(milliseconds: 280));
-
-  /// Pull distance that brings the menu fully out.
-  static const _reveal = 140.0;
-
+  late final _menu = AnimationController(vsync: this, duration: const Duration(milliseconds: 180));
   @override
   void initState() {
     super.initState();
@@ -36,203 +35,123 @@ class _PlayScreenState extends ConsumerState<PlayScreen> with SingleTickerProvid
   }
 
   void _onPull() {
-    final p = playMenuPull.value;
-    final open = ref.read(playMenuProvider);
-    if (p > 0 && !open) {
-      _menu.value = (p / _reveal).clamp(0.0, 1.0);
-    } else if (p == 0) {
-      _settle(open);
+    if (!ref.read(playCardsProvider)) return;
+    final pull = playMenuPull.value;
+    if (pull > 0 && !ref.read(playMenuProvider)) {
+      _menu.value = (pull / 140).clamp(0, 1);
+    } else if (pull == 0) {
+      _settle(ref.read(playMenuProvider));
     }
   }
 
   void _settle(bool open) => _menu.animateTo(open ? 1 : 0, curve: Curves.easeOutCubic);
-
-  void _set(PlayMode m) {
+  Future<void> _select(PlayMode next) async {
+    if (ref.read(playCardsProvider) && !ref.read(playModeProvider).parlay) {
+      final user = ref.read(sessionProvider).value?.id;
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('pack.pending.$user');
+      if (!mounted) return;
+    }
     HapticFeedback.selectionClick();
-    ref.read(playModeProvider.notifier).set(m);
+    ref.read(playMenuProvider.notifier).close();
+    ref.read(playCardsProvider.notifier).set(next.parlay && !next.contests);
+    ref.read(playModeProvider.notifier).set(next.copyWith(revision: ref.read(playModeProvider).revision + 1));
   }
 
   @override
   Widget build(BuildContext context) {
     ref.listen(playMenuProvider, (_, open) => _settle(open));
     final mode = ref.watch(playModeProvider);
-    final still = MediaQuery.of(context).disableAnimations;
-    final key = mode.contests ? 'contests' : (mode.parlay ? 'parlay-${mode.sport}' : 'packs');
-    return Stack(
+    final cards = ref.watch(playCardsProvider);
+    final key = ValueKey('${mode.place}-${mode.sport}-${mode.revision}');
+    final navigation = PlayNavigation(mode: mode, onSelect: _select);
+    return Column(
       children: [
-        const Positioned.fill(child: PineBackdrop()),
-        Positioned.fill(
-          child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 220),
-            switchInCurve: Curves.easeOutCubic,
-            switchOutCurve: Curves.easeIn,
-            transitionBuilder: (child, a) => FadeTransition(opacity: a, child: child),
-            child: switch (mode) {
-              PlayMode(contests: true) => const ContestHub(key: ValueKey('contests')),
-              PlayMode(parlay: true) => ParlayDeck(key: ValueKey(key), sport: mode.sport),
-              _ => PackStore(key: ValueKey(key), sport: mode.sport),
-            },
-          ),
-        ),
-        AnimatedBuilder(
-          animation: _menu,
-          builder: (context, _) => _menu.value == 0
-              ? const SizedBox.shrink()
-              : Positioned.fill(
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: () => ref.read(playMenuProvider.notifier).close(),
-                    child: ColoredBox(color: Colors.black.withValues(alpha: 0.5 * _menu.value)),
-                  ),
+        if (!cards) navigation,
+        Expanded(
+          child: Stack(
+            children: [
+              const Positioned.fill(child: PineBackdrop()),
+              Positioned.fill(
+                child: switch (mode) {
+                  PlayMode(contests: true) => ContestHub(key: key),
+                  PlayMode(parlay: true) => ParlayDeck(key: key, sport: mode.sport),
+                  _ => PackStore(key: key, sport: mode.sport),
+                },
+              ),
+              if (cards)
+                AnimatedBuilder(
+                  animation: _menu,
+                  child: navigation,
+                  builder: (context, panel) {
+                    if (_menu.value == 0) return const SizedBox.shrink();
+                    return Positioned.fill(
+                      child: Stack(
+                        children: [
+                          Positioned.fill(
+                            child: GestureDetector(
+                              onTap: () => ref.read(playMenuProvider.notifier).close(),
+                              child: ColoredBox(color: Colors.black.withValues(alpha: .45 * _menu.value)),
+                            ),
+                          ),
+                          Positioned(
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            child: ClipRect(
+                              child: Align(
+                                alignment: Alignment.bottomCenter,
+                                heightFactor: _menu.value,
+                                child: IgnorePointer(ignoring: _menu.value < .8, child: panel),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
                 ),
-        ),
-        Positioned(
-          top: 0,
-          left: 0,
-          right: 0,
-          child: AnimatedBuilder(
-            animation: _menu,
-            child: _panel(mode),
-            builder: (context, panel) => IgnorePointer(
-              ignoring: _menu.value < 0.5,
-              child: still
-                  ? Opacity(opacity: _menu.value, child: panel)
-                  : ClipRect(
-                      child: Align(alignment: Alignment.bottomCenter, heightFactor: _menu.value, child: panel),
-                    ),
-            ),
+            ],
           ),
         ),
       ],
     );
   }
-
-  Widget _panel(PlayMode mode) => GestureDetector(
-    onVerticalDragUpdate: (d) => _menu.value = (_menu.value + d.delta.dy / 260).clamp(0.0, 1.0),
-    onVerticalDragEnd: (d) {
-      final open = (d.primaryVelocity ?? 0) > -300 && _menu.value > 0.6;
-      if (!open) ref.read(playMenuProvider.notifier).close();
-      _settle(open);
-    },
-    child: Container(
-      decoration: const BoxDecoration(
-        color: C.surface,
-        border: Border(bottom: BorderSide(color: C.line)),
-        boxShadow: [BoxShadow(color: Colors.black38, blurRadius: 24, offset: Offset(0, 12))],
-      ),
-      padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _Segments(
-            label: 'Play',
-            options: const [('solo', 'Solo'), ('contests', 'Contests')],
-            selected: mode.contests ? 'contests' : 'solo',
-            onSelect: (v) => _set(mode.copyWith(contests: v == 'contests')),
-          ),
-          AnimatedSize(
-            duration: const Duration(milliseconds: 200),
-            curve: Curves.easeOutCubic,
-            alignment: Alignment.topCenter,
-            child: mode.contests
-                ? const SizedBox(width: double.infinity)
-                : Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _Segments(
-                        label: 'Prediction mode',
-                        options: const [('packs', 'Packs'), ('parlay', 'Parlay')],
-                        selected: mode.parlay ? 'parlay' : 'packs',
-                        onSelect: (v) => _set(mode.copyWith(parlay: v == 'parlay')),
-                      ),
-                      _Segments(
-                        label: 'Sport',
-                        options: const [('all', 'All sports'), ('nba', 'NBA'), ('nfl', 'NFL')],
-                        selected: mode.sport,
-                        onSelect: (v) => _set(mode.copyWith(sport: v)),
-                      ),
-                    ],
-                  ),
-          ),
-          Semantics(
-            button: true,
-            label: 'Close menu',
-            excludeSemantics: true,
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: () => ref.read(playMenuProvider.notifier).close(),
-              child: SizedBox(
-                height: 26,
-                width: double.infinity,
-                child: Center(
-                  child: Container(
-                    width: 36,
-                    height: 4,
-                    decoration: BoxDecoration(color: C.faint, borderRadius: BorderRadius.circular(2)),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    ),
-  );
 }
 
-class _Segments extends StatelessWidget {
-  const _Segments({required this.label, required this.options, required this.selected, required this.onSelect});
-  final String label;
-  final List<(String, String)> options;
-  final String selected;
-  final ValueChanged<String> onSelect;
-
+/// Text tabs stay visible on the shelf and reappear from the card menu.
+class PlayNavigation extends StatelessWidget {
+  const PlayNavigation({super.key, required this.mode, required this.onSelect});
+  final PlayMode mode;
+  final ValueChanged<PlayMode> onSelect;
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(top: 10),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label.toUpperCase(), style: T.label.copyWith(fontSize: 11)),
-        const SizedBox(height: 6),
-        Row(
-          children: [
-            for (final (id, text) in options)
-              Expanded(
-                child: Padding(
-                  padding: EdgeInsets.only(right: id == options.last.$1 ? 0 : 8),
-                  child: Semantics(
-                    selected: id == selected,
-                    button: true,
-                    child: GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onTap: () => onSelect(id),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 180),
-                        height: 44,
-                        alignment: Alignment.centerLeft,
-                        padding: const EdgeInsets.only(left: 10),
-                        decoration: BoxDecoration(
-                          border: Border(
-                            bottom: BorderSide(color: id == selected ? C.green : C.line, width: id == selected ? 2 : 1),
-                          ),
-                        ),
-                        child: Text(
-                          text,
-                          style: TextStyle(
-                            fontSize: 14.5,
-                            fontWeight: id == selected ? FontWeight.w700 : FontWeight.w500,
-                            color: id == selected ? C.green : C.dim,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
+  Widget build(BuildContext context) => Material(
+    color: C.bg,
+    child: Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          UnderTabs(
+            labels: const ['Packs', 'Parlays', 'Contests'],
+            index: mode.contests
+                ? 2
+                : mode.parlay
+                ? 1
+                : 0,
+            onChanged: (i) => onSelect(mode.copyWith(contests: i == 2, parlay: i == 1)),
+          ),
+          if (!mode.contests)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: UnderTabs(
+                labels: const ['All sports', 'NFL', 'NBA'],
+                index: const ['all', 'nfl', 'nba'].indexOf(mode.sport),
+                onChanged: (i) => onSelect(mode.copyWith(sport: const ['all', 'nfl', 'nba'][i])),
               ),
-          ],
-        ),
-      ],
+            ),
+        ],
+      ),
     ),
   );
 }

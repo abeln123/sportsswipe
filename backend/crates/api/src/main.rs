@@ -48,10 +48,10 @@ async fn main() -> anyhow::Result<()> {
         .merge(analyst::routes())
         .merge(export::routes())
         .merge(packs::routes())
-        .merge(presentation::routes())
         .merge(head_to_head::routes())
         .merge(collectibles::routes())
-        .route("/healthz", get(|| async { "ok" }));
+        .route("/healthz", get(|| async { "ok" }))
+        .fallback(|| async { crate::error::ApiError::NotFound });
 
     let mut app = Router::new()
         .nest("/v1", api)

@@ -111,6 +111,7 @@ class _PackDeckState extends ConsumerState<PackDeck> {
 
   /// Everything goes out at the end of a deck; the recap also offers leftovers.
   Future<void> _finish() async {
+    ref.read(playCardsProvider.notifier).set(false);
     ref.read(pickQueueProvider.notifier).flush();
     try {
       final r = await api.get('/packs?sport=${widget.sport}');

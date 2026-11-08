@@ -23,6 +23,8 @@ dependencies:
   audioplayers: ^6.8.1
 
 dev_dependencies:
+  integration_test:
+    sdk: flutter
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0

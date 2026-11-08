@@ -34,7 +34,6 @@ fn league(sport: Option<&str>) -> ApiResult<Option<&str>> {
 }
 
 async fn store(State(state): State<AppState>, user: AuthUser, Query(q): Query<SportQuery>) -> ApiResult<Json<Value>> {
-    crate::presentation::ensure(&state, user).await?;
     let league = league(q.sport.as_deref())?;
     let mut packs = Vec::new();
     for p in ss_db::packs::pack_types(&state.pool).await? {
@@ -56,7 +55,7 @@ async fn store(State(state): State<AppState>, user: AuthUser, Query(q): Query<Sp
     .fetch_one(&state.pool)
     .await?;
     Ok(Json(json!({
-        "packs": packs, "presentationAvailable": user.is_admin,
+        "packs": packs,
         "leftoverCount": leftover_count,
         "challenges": ss_db::packs::open_challenges(&state.pool, user.id).await?,
     })))

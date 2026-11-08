@@ -182,7 +182,11 @@ class SwipeableState extends State<Swipeable> with SingleTickerProviderStateMixi
     final speed = math.max(velocity.distance, 1600.0);
     final ms = (((_to - _from).distance / speed) * 1000).clamp(140, 260).round();
     _c.value = 0;
-    await _c.animateTo(1, duration: Duration(milliseconds: ms), curve: Curves.easeIn);
+    await _c.animateTo(
+      1,
+      duration: Duration(milliseconds: ms),
+      curve: Curves.easeIn,
+    );
     if (!mounted) return;
     if (action == 'skip') {
       widget.onSkip?.call();
@@ -226,14 +230,21 @@ class SwipeableState extends State<Swipeable> with SingleTickerProviderStateMixi
           offset: _pos,
           child: Transform.rotate(
             angle: angle,
-            child: Stack(children: [
-              widget.child,
-              if (upward && py > 0.12)
-                _stamp('SKIP', C.dim, py, 0, top: true)
-              else if (px.abs() > 0.12)
-                _stamp(px > 0 ? widget.overLabel : widget.underLabel, px > 0 ? const Color(0xFF2FA968) : const Color(0xFF8B6FE0), px.abs(), px > 0 ? -0.25 : 0.25,
-                    left: px > 0),
-            ]),
+            child: Stack(
+              children: [
+                RepaintBoundary(child: widget.child),
+                if (upward && py > 0.12)
+                  _stamp('SKIP', C.dim, py, 0, top: true)
+                else if (px.abs() > 0.12)
+                  _stamp(
+                    px > 0 ? widget.overLabel : widget.underLabel,
+                    px > 0 ? const Color(0xFF2FA968) : const Color(0xFF8B6FE0),
+                    px.abs(),
+                    px > 0 ? -0.25 : 0.25,
+                    left: px > 0,
+                  ),
+              ],
+            ),
           ),
         ),
       ),
@@ -241,27 +252,33 @@ class SwipeableState extends State<Swipeable> with SingleTickerProviderStateMixi
   }
 
   Widget _stamp(String text, Color color, double opacity, double angle, {bool left = false, bool top = false}) => Positioned(
-        top: top ? null : 70,
-        bottom: top ? 40 : null,
-        left: top ? 0 : (left ? 22 : null),
-        right: top ? 0 : (left ? null : 22),
-        child: IgnorePointer(
-          child: Opacity(
-            opacity: opacity,
-            child: Center(
-              widthFactor: top ? null : 1,
-              child: Transform.rotate(
-                angle: angle,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                  decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.9), border: Border.all(color: color, width: 3)),
-                  child: Text(text, style: TextStyle(fontFamily: kCondensed, fontWeight: FontWeight.w800, fontSize: 30, color: color)),
-                ),
+    top: top ? null : 70,
+    bottom: top ? 40 : null,
+    left: top ? 0 : (left ? 22 : null),
+    right: top ? 0 : (left ? null : 22),
+    child: IgnorePointer(
+      child: Opacity(
+        opacity: opacity,
+        child: Center(
+          widthFactor: top ? null : 1,
+          child: Transform.rotate(
+            angle: angle,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.9),
+                border: Border.all(color: color, width: 3),
+              ),
+              child: Text(
+                text,
+                style: TextStyle(fontFamily: kCondensed, fontWeight: FontWeight.w800, fontSize: 30, color: color),
               ),
             ),
           ),
         ),
-      );
+      ),
+    ),
+  );
 }
 
 /// The top card scaled to fill the available space (never cut off), with
@@ -311,18 +328,22 @@ class _CardStageState extends State<CardStage> {
   bool _held = false;
 
   Widget _fit(Widget card) => Center(
-        child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: widget.cardWidth * 1.3),
-          child: FittedBox(fit: BoxFit.contain, child: SizedBox(width: widget.cardWidth, child: card)),
-        ),
-      );
+    child: ConstrainedBox(
+      constraints: BoxConstraints(maxWidth: widget.cardWidth * 1.3),
+      child: FittedBox(
+        fit: BoxFit.contain,
+        child: SizedBox(width: widget.cardWidth, child: card),
+      ),
+    ),
+  );
 
   @override
   Widget build(BuildContext context) {
     final still = MediaQuery.of(context).disableAnimations;
     return Padding(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-        child: Stack(children: [
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+      child: Stack(
+        children: [
           if (widget.next != null)
             Positioned.fill(
               child: IgnorePointer(
@@ -377,8 +398,9 @@ class _CardStageState extends State<CardStage> {
               ),
             ),
           ),
-        ]),
-      );
+        ],
+      ),
+    );
   }
 }
 
@@ -402,10 +424,10 @@ class _SwipeCoachOverlayState extends State<SwipeCoachOverlay> with SingleTicker
   }
 
   List<(String, String, IconData, Color, Offset)> get _moves => [
-        ('Swipe right', 'Over', Icons.arrow_forward_rounded, C.over, const Offset(1, 0)),
-        ('Swipe left', 'Under', Icons.arrow_back_rounded, C.under, const Offset(-1, 0)),
-        if (widget.skip) ('Swipe up', 'Skip', Icons.arrow_upward_rounded, C.dim, const Offset(0, -1)),
-      ];
+    ('Swipe right', 'Over', Icons.arrow_forward_rounded, C.over, const Offset(1, 0)),
+    ('Swipe left', 'Under', Icons.arrow_back_rounded, C.under, const Offset(-1, 0)),
+    if (widget.skip) ('Swipe up', 'Skip', Icons.arrow_upward_rounded, C.dim, const Offset(0, -1)),
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -431,54 +453,65 @@ class _SwipeCoachOverlayState extends State<SwipeCoachOverlay> with SingleTicker
             final back = ((t - 0.8) / 0.2).clamp(0.0, 1.0);
             final move = moves[i];
             final offset = move.$5 * 34 * out;
-            return Column(mainAxisSize: MainAxisSize.min, children: [
-              SizedBox(
-                height: 130,
-                width: 200,
-                child: Stack(alignment: Alignment.center, children: [
-                  Opacity(
-                    opacity: 1 - back,
-                    child: Transform.translate(
-                      offset: offset,
-                      child: Transform.rotate(
-                        angle: move.$5.dx * 0.18 * out,
-                        child: Container(
-                          width: 62,
-                          height: 86,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF2F4F6),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Color.lerp(Colors.white, move.$4, out)!, width: 2),
-                            boxShadow: const [BoxShadow(color: Color(0x66000000), blurRadius: 16, offset: Offset(0, 6))],
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox(
+                  height: 130,
+                  width: 200,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      Opacity(
+                        opacity: 1 - back,
+                        child: Transform.translate(
+                          offset: offset,
+                          child: Transform.rotate(
+                            angle: move.$5.dx * 0.18 * out,
+                            child: Container(
+                              width: 62,
+                              height: 86,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF2F4F6),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: Color.lerp(Colors.white, move.$4, out)!, width: 2),
+                                boxShadow: const [BoxShadow(color: Color(0x66000000), blurRadius: 16, offset: Offset(0, 6))],
+                              ),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Container(width: 30, height: 4, color: const Color(0xFFCBD3DB)),
+                                  const SizedBox(height: 6),
+                                  Container(width: 40, height: 4, color: const Color(0xFFCBD3DB)),
+                                  const SizedBox(height: 6),
+                                  Container(width: 22, height: 4, color: const Color(0xFFCBD3DB)),
+                                ],
+                              ),
+                            ),
                           ),
-                          child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                            Container(width: 30, height: 4, color: const Color(0xFFCBD3DB)),
-                            const SizedBox(height: 6),
-                            Container(width: 40, height: 4, color: const Color(0xFFCBD3DB)),
-                            const SizedBox(height: 6),
-                            Container(width: 22, height: 4, color: const Color(0xFFCBD3DB)),
-                          ]),
                         ),
                       ),
-                    ),
+                      Opacity(
+                        opacity: 1 - back,
+                        child: Transform.translate(
+                          offset: offset + const Offset(14, 34),
+                          child: const Icon(Icons.touch_app_rounded, color: Colors.white, size: 34),
+                        ),
+                      ),
+                    ],
                   ),
-                  Opacity(
-                    opacity: 1 - back,
-                    child: Transform.translate(
-                      offset: offset + const Offset(14, 34),
-                      child: const Icon(Icons.touch_app_rounded, color: Colors.white, size: 34),
-                    ),
-                  ),
-                ]),
-              ),
-              const SizedBox(height: 10),
-              const Text('How to play', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: C.text)),
-              const SizedBox(height: 18),
-              for (final (k, m) in moves.indexed)
-                _row(m.$1, m.$2, m.$3, m.$4, k == i),
-              const SizedBox(height: 14),
-              const Text('Pull down anytime for the menu.', style: TextStyle(fontSize: 12.5, color: C.dim)),
-            ]);
+                ),
+                const SizedBox(height: 10),
+                const Text(
+                  'How to play',
+                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: C.text),
+                ),
+                const SizedBox(height: 18),
+                for (final (k, m) in moves.indexed) _row(m.$1, m.$2, m.$3, m.$4, k == i),
+                const SizedBox(height: 14),
+                const Text('Pull down anytime for the menu.', style: TextStyle(fontSize: 12.5, color: C.dim)),
+              ],
+            );
           },
         ),
       ),
@@ -486,22 +519,30 @@ class _SwipeCoachOverlayState extends State<SwipeCoachOverlay> with SingleTicker
   }
 
   Widget _row(String gesture, String result, IconData icon, Color color, bool active) => AnimatedContainer(
-        duration: const Duration(milliseconds: 220),
-        curve: Curves.easeOut,
-        width: 240,
-        margin: const EdgeInsets.symmetric(vertical: 4),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        decoration: BoxDecoration(
-          color: active ? color.withValues(alpha: 0.14) : Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: active ? color.withValues(alpha: 0.6) : C.line),
+    duration: const Duration(milliseconds: 220),
+    curve: Curves.easeOut,
+    width: 240,
+    margin: const EdgeInsets.symmetric(vertical: 4),
+    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+    decoration: BoxDecoration(
+      color: active ? color.withValues(alpha: 0.14) : Colors.transparent,
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(color: active ? color.withValues(alpha: 0.6) : C.line),
+    ),
+    child: Row(
+      children: [
+        Icon(icon, size: 18, color: color),
+        const SizedBox(width: 12),
+        Text(
+          gesture,
+          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: C.text),
         ),
-        child: Row(children: [
-          Icon(icon, size: 18, color: color),
-          const SizedBox(width: 12),
-          Text(gesture, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: C.text)),
-          const Spacer(),
-          Text(result, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: color)),
-        ]),
-      );
+        const Spacer(),
+        Text(
+          result,
+          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: color),
+        ),
+      ],
+    ),
+  );
 }

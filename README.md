@@ -90,9 +90,9 @@ geometry; no Blender renders or recorded pack footage are bundled. Test drag fee
 audio timing, haptics, and frame pacing on physical iPhone and Android hardware
 before release.
 
-Admin judging flow: **Play → Presentation Pack → Collection → Diamond → Sell**.
-The pack contains five fixed fictional cards and an explicitly marked 400/400
-admin Diamond grant. See [collectible setup](collectibles/README.md) for devnet
+Admin judging flow: **Collection → Diamond → Sell**.
+The collection retains an explicitly marked fictional 400/400 admin Diamond grant.
+There is no separate presentation pack. See [collectible setup](collectibles/README.md) for devnet
 issuer and presentation-buyer configuration.
 
 Card footer share arrows create ten-card head-to-heads. A friend receives the

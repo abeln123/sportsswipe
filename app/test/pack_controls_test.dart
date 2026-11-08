@@ -16,6 +16,11 @@ import 'package:sportsswipe/state/pick_queue.dart';
 import 'package:sportsswipe/screens/play/pack_art.dart';
 import 'package:sportsswipe/screens/play/pack_feedback.dart';
 import 'package:sportsswipe/screens/play/pack_store.dart';
+import 'package:sportsswipe/screens/play/play_screen.dart';
+import 'package:sportsswipe/screens/profile/profile_screen.dart';
+import 'package:sportsswipe/card/sport_card.dart';
+import 'package:sportsswipe/state/play.dart';
+import 'package:sportsswipe/ui/shell.dart';
 import 'package:sportsswipe/ui/challenge_share.dart';
 import 'package:sportsswipe/ui/widgets.dart';
 
@@ -34,7 +39,9 @@ void main() {
         final args = call.arguments;
         if (args is Map && args['playerId'] is String) {
           TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(
-            MethodChannel("xyz.luan/audioplayers/events/${args['playerId']}"), (_) async => null);
+            MethodChannel("xyz.luan/audioplayers/events/${args['playerId']}"),
+            (_) async => null,
+          );
         }
         return 1;
       });
@@ -64,6 +71,31 @@ void main() {
           };
         }
         if (r.url.path == '/v1/me/summary') body = {'balance': 1000, 'pendingCount': 0, 'unrevealedCount': 0, 'isAdmin': true};
+        if (r.url.path == '/v1/me/collection') {
+          body = {
+            'series': 'Debut Series',
+            'collected': 1,
+            'total': 1,
+            'unassignedFinishes': [],
+            'cards': [
+              {
+                'card': {
+                  'playerId': 1,
+                  'fullName': 'Riley Swift',
+                  'firstName': 'Riley',
+                  'lastName': 'Swift',
+                  'teamAbbr': 'SSP',
+                  'league': 'nfl',
+                  'jerseyNumber': '7',
+                  'colorway': {'base': '784CC6'},
+                },
+                'mastery': {'count': 400, 'tier': 'diamond'},
+                'finish': 'base',
+                'presentation': true,
+              },
+            ],
+          };
+        }
         if (r.url.path == '/v1/friends') body = {'friends': []};
         if (r.url.path == '/v1/head-to-heads') {
           commands.add((jsonDecode(r.body) as Map)['commandId'] as String);
@@ -99,7 +131,7 @@ void main() {
 
   testWidgets('large catalog is lazy and purchase preview has no continuous repaint ticker', (t) async {
     await mount(t, const PackStore(sport: 'all'));
-    expect(find.text('Presentation Pack'), findsOneWidget);
+    expect(find.text('Presentation Pack'), findsNothing);
     expect(find.byType(FoilPack).evaluate().length, lessThan(10));
     await t.ensureVisible(find.text('Starter Pack'));
     await t.tap(find.text('Starter Pack'));
@@ -107,6 +139,55 @@ void main() {
     expect(find.text('Open pack · 10 coins'), findsOneWidget);
     expect(t.binding.hasScheduledFrame, isFalse);
     await expectLater(find.byKey(const ValueKey('surface')), matchesGoldenFile('goldens/pack_purchase.png'));
+    expect(t.takeException(), isNull);
+  });
+  testWidgets('home tabs collapse into a menu only during cards and return to the shelf', (t) async {
+    await mount(
+      t,
+      const Column(
+        children: [
+          AppHeader(play: true),
+          Expanded(child: PlayScreen()),
+        ],
+      ),
+    );
+    expect(find.text('Parlays'), findsOneWidget);
+    expect(find.text('Contests'), findsOneWidget);
+    expect(find.text('All sports'), findsOneWidget);
+    final container = ProviderScope.containerOf(t.element(find.byType(PlayScreen)));
+    await t.tap(find.text('NFL'));
+    await t.pumpAndSettle();
+    expect(container.read(playModeProvider).sport, 'nfl');
+    container.read(playCardsProvider.notifier).set(true);
+    await t.pumpAndSettle();
+    expect(find.text('Parlays'), findsNothing);
+    await t.tap(find.bySemanticsLabel('Packs, change mode and sport'));
+    await t.pumpAndSettle();
+    expect(find.text('Parlays'), findsOneWidget);
+    await t.tap(find.text('Packs').last);
+    await t.pumpAndSettle();
+    expect(container.read(playCardsProvider), isFalse);
+    expect(find.text('All sports'), findsOneWidget);
+    expect(t.takeException(), isNull);
+  });
+  testWidgets('earned Diamond is styled and opens full-size with sharing and selling', (t) async {
+    await mount(t, const ProfileScreen(initialTab: 1));
+    final tile = find.byType(CardTile);
+    await t.ensureVisible(tile);
+    await t.pumpAndSettle();
+    expect(t.widget<CardTile>(tile).finish, 'diamond');
+    await t.tap(tile);
+    await t.pumpAndSettle();
+    expect(find.byType(CollectionCardView), findsOneWidget);
+    final card = t.widget<SportCard>(find.descendant(of: find.byType(CollectionCardView), matching: find.byType(SportCard)));
+    expect(card.finish, 'diamond');
+    expect(card.width, greaterThan(300));
+    expect(find.text('Share card'), findsOneWidget);
+    expect(find.text('Sell Diamond edition'), findsOneWidget);
+    await expectLater(find.byKey(const ValueKey('surface')), matchesGoldenFile('goldens/collection_diamond_detail.png'));
+    await t.tap(find.byType(CloseButton));
+    await t.pumpAndSettle();
+    expect(find.byType(CardTile), findsOneWidget);
     expect(t.takeException(), isNull);
   });
   testWidgets('wager buttons clamp to balance, exact entry validates and zero is allowed', (t) async {

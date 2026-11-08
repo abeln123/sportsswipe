@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -38,7 +39,8 @@ class FoilPack extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final premium = badge != null || name.toLowerCase().contains('presentation') || RegExp(r'^\d+[x×]\b',caseSensitive:false).hasMatch(name);
+    final premium =
+        badge != null || name.toLowerCase().contains('presentation') || RegExp(r'^\d+[x×]\b', caseSensitive: false).hasMatch(name);
     final palette = premium ? const [Color(0xFF181C20), Color(0xFF343A40)] : colors;
     final base = Color.lerp(palette.first, palette.last, .38)!;
     final ink = premium
@@ -48,60 +50,167 @@ class FoilPack extends StatelessWidget {
         : const Color(0xFFF6F3E7);
     final h = width * foilPackHeightRatio;
     final title = name.replaceFirst(RegExp(r'\s+pack$', caseSensitive: false), '\nPack');
-    return RepaintBoundary(child: SizedBox(
-      width: width,
-      height: h,
-      child: CustomPaint(
-        isComplex: true,
-        willChange: tension != 0,
-        painter: _FoilPainter(palette, sheen, tension),
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(width * .15, h * .17, width * .13, h * .14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'SPORTS\nSWIPE',
-                style: TextStyle(
-                  fontSize: width * .066,
-                  height: 1.02,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: .25,
-                  color: ink.withValues(alpha: .88),
-                ),
-              ),
-              const Spacer(flex: 3),
-              Text(
-                title,
-                maxLines: 3,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: width * .205,
-                  height: .98,
-                  letterSpacing: -width * .006,
-                  fontWeight: FontWeight.w500,
-                  color: ink,
-                ),
-              ),
-              if (badge != null && !name.toLowerCase().contains(badge!.toLowerCase()))
-                Padding(
-                  padding: EdgeInsets.only(top: width * .07),
-                  child: Text(
-                    badge!.toUpperCase(),
-                    style: TextStyle(fontSize: width * .095, fontWeight: FontWeight.w600, color: ink),
+    return RepaintBoundary(
+      child: SizedBox(
+        width: width,
+        height: h,
+        child: _FoilSurface(
+          colors: palette,
+          sheen: sheen,
+          tension: tension,
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(width * .15, h * .17, width * .13, h * .14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'SPORTS\nSWIPE',
+                  style: TextStyle(
+                    fontSize: width * .066,
+                    height: 1.02,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: .25,
+                    color: ink.withValues(alpha: .88),
                   ),
                 ),
-              const Spacer(flex: 2),
-              Text(
-                (caption ?? '5 cards per pack').toUpperCase(),
-                style: TextStyle(fontSize: width * .052, letterSpacing: .6, color: ink.withValues(alpha: .85)),
-              ),
-            ],
+                const Spacer(flex: 3),
+                Text(
+                  title,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: width * .205,
+                    height: .98,
+                    letterSpacing: -width * .006,
+                    fontWeight: FontWeight.w500,
+                    color: ink,
+                  ),
+                ),
+                if (badge != null && !name.toLowerCase().contains(badge!.toLowerCase()))
+                  Padding(
+                    padding: EdgeInsets.only(top: width * .07),
+                    child: Text(
+                      badge!.toUpperCase(),
+                      style: TextStyle(fontSize: width * .095, fontWeight: FontWeight.w600, color: ink),
+                    ),
+                  ),
+                const Spacer(flex: 2),
+                Text(
+                  (caption ?? '5 cards per pack').toUpperCase(),
+                  style: TextStyle(fontSize: width * .052, letterSpacing: .6, color: ink.withValues(alpha: .85)),
+                ),
+              ],
+            ),
           ),
         ),
       ),
-    ));
+    );
   }
+}
+
+/// Rasterize each foil palette once. Retaining a bounded set of textures avoids
+/// replaying the blur-heavy foil display list during scrolling and sheet motion.
+class FoilRasterCache {
+  static final _images = <String, ui.Image>{};
+  static final _pending = <String, Future<ui.Image>>{};
+  static const capacity = 12;
+  static int get length => _images.length;
+  static Future<ui.Image> acquire(List<Color> colors, double sheen) async {
+    final key = '${colors.map((c) => c.toARGB32()).join(':')}:$sheen';
+    final cached = _images.remove(key);
+    if (cached != null) {
+      _images[key] = cached;
+      return cached.clone();
+    }
+    final task = _pending.putIfAbsent(
+      key,
+      () => _render(colors, sheen)
+          .then((image) {
+            _images[key] = image;
+            while (_images.length > capacity) {
+              _images.remove(_images.keys.first)?.dispose();
+            }
+            return image;
+          })
+          .whenComplete(() => _pending.remove(key)),
+    );
+    return (await task).clone();
+  }
+
+  static Future<ui.Image> _render(List<Color> colors, double sheen) async {
+    const width = 220.0, pixels = 512;
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder)..scale(pixels / width);
+    _FoilPainter(colors, sheen, 0).paint(canvas, const Size(width, width * foilPackHeightRatio));
+    final picture = recorder.endRecording();
+    try {
+      return await picture.toImage(pixels, (pixels * foilPackHeightRatio).ceil());
+    } finally {
+      picture.dispose();
+    }
+  }
+}
+
+class _FoilSurface extends StatefulWidget {
+  const _FoilSurface({required this.colors, required this.sheen, required this.tension, required this.child});
+  final List<Color> colors;
+  final double sheen, tension;
+  final Widget child;
+  @override
+  State<_FoilSurface> createState() => _FoilSurfaceState();
+}
+
+class _FoilSurfaceState extends State<_FoilSurface> {
+  ui.Image? _image;
+  var _version = 0;
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void didUpdateWidget(_FoilSurface old) {
+    super.didUpdateWidget(old);
+    if (!listEquals(old.colors, widget.colors) || old.sheen != widget.sheen) _load();
+  }
+
+  Future<void> _load() async {
+    final version = ++_version;
+    try {
+      final image = await FoilRasterCache.acquire(widget.colors, widget.sheen);
+      if (!mounted || version != _version) {
+        image.dispose();
+        return;
+      }
+      setState(() {
+        _image?.dispose();
+        _image = image;
+      });
+    } catch (_) {
+      /* Keep the vector fallback if a renderer cannot make a texture. */
+    }
+  }
+
+  @override
+  void dispose() {
+    _version++;
+    _image?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => _image == null || widget.tension != 0
+      ? CustomPaint(painter: _FoilPainter(widget.colors, widget.sheen, widget.tension), child: widget.child)
+      : Stack(
+          fit: StackFit.expand,
+          children: [
+            Positioned.fill(
+              child: RawImage(image: _image, fit: BoxFit.fill, filterQuality: FilterQuality.low),
+            ),
+            widget.child,
+          ],
+        );
 }
 
 Path _foilOutline(Size s, double tension) {
@@ -640,8 +749,8 @@ class _PackOpeningState extends State<PackOpening> with SingleTickerProviderStat
       badge: widget.pack.badge,
       caption: widget.pack.caption,
       width: w,
-      sheen: .4 + tension * .16,
-      tension: tension,
+      sheen: .4,
+      tension: 0,
     );
     final extent = _cut.limits(size);
     final anchor = _cut.anchor(size);
