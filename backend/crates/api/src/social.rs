@@ -263,7 +263,7 @@ async fn thread_access(pool: &PgPool, user_id: Uuid, thread_id: Uuid) -> ApiResu
 }
 
 async fn threads(State(state): State<AppState>, user: AuthUser) -> ApiResult<Json<Value>> {
-    let rows: Vec<(Uuid, String, String, Option<Uuid>, i64, i64, Option<String>, Option<chrono::DateTime<chrono::Utc>>)> = sqlx::query_as(
+    let rows: Vec<(Uuid, String, String, Option<Uuid>, i64, i64, Option<String>, Option<chrono::DateTime<chrono::Utc>>, Option<Uuid>)> = sqlx::query_as(
         r#"WITH mine AS (
              SELECT t.id, t.kind, p.display_name AS title, p.user_id AS other_id, t.last_seq FROM threads t
              JOIN profiles p ON p.user_id = CASE WHEN t.dm_a = $1 THEN t.dm_b ELSE t.dm_a END
@@ -274,7 +274,7 @@ async fn threads(State(state): State<AppState>, user: AuthUser) -> ApiResult<Jso
              JOIN leagues l ON l.thread_id = t.id JOIN league_members m ON m.league_id = l.id AND m.user_id = $1
            )
            SELECT mine.id, mine.kind, mine.title, mine.other_id, mine.last_seq,
-                  COALESCE(r.last_read_seq, 0), msg.body, msg.created_at
+                  COALESCE(r.last_read_seq, 0), msg.body, msg.created_at, msg.share_id
            FROM mine LEFT JOIN thread_reads r ON r.thread_id = mine.id AND r.user_id = $1
            LEFT JOIN messages msg ON msg.thread_id = mine.id AND msg.seq = mine.last_seq
            ORDER BY msg.created_at DESC NULLS LAST"#,
@@ -282,10 +282,15 @@ async fn threads(State(state): State<AppState>, user: AuthUser) -> ApiResult<Jso
     .bind(user.id)
     .fetch_all(&state.pool)
     .await?;
-    Ok(Json(json!({ "threads": rows.iter().map(|(id, kind, title, other, last, read, body, at)| json!({
-        "threadId": id, "kind": kind, "title": title, "otherUserId": other,
-        "unread": (last - read).max(0), "lastMessage": body, "lastAt": at,
-    })).collect::<Vec<_>>() })))
+    let mut out = Vec::new();
+    for (id,kind,title,other,last,read,body,at,share) in rows {
+        if let Some(other) = other { if blocked_either(&state.pool,user.id,other).await? { continue; } }
+        let shared = match share { Some(s) => Some(crate::shares::visible(&state,user.id,s).await?), None => None };
+        let preview = body.filter(|b|!b.is_empty()).or_else(||shared.as_ref().map(|_|"Shared an item".to_string()));
+        out.push(json!({"threadId":id,"kind":kind,"title":title,"otherUserId":other,
+            "unread":(last-read).max(0),"lastMessage":preview,"lastAt":at,"shared":shared}));
+    }
+    Ok(Json(json!({"threads":out})))
 }
 
 async fn open_dm(State(state): State<AppState>, user: AuthUser, Json(b): Json<UserBody>) -> ApiResult<Json<Value>> {
@@ -312,9 +317,11 @@ struct MessagesQuery {
 
 async fn messages(State(state): State<AppState>, user: AuthUser, Path(id): Path<Uuid>, Query(q): Query<MessagesQuery>) -> ApiResult<Json<Value>> {
     thread_access(&state.pool, user.id, id).await?;
-    let after = q.after_seq.unwrap_or(0);
-    let rows: Vec<(i64, Uuid, String, String, chrono::DateTime<chrono::Utc>, Uuid)> = sqlx::query_as(
-        r#"SELECT m.seq, m.sender_id, p.display_name, m.body, m.created_at, m.client_msg_id FROM messages m
+    let read: i64 = sqlx::query_scalar("SELECT COALESCE((SELECT last_read_seq FROM thread_reads WHERE thread_id=$1 AND user_id=$2),0)")
+        .bind(id).bind(user.id).fetch_one(&state.pool).await?;
+    let after = q.after_seq.unwrap_or(read.saturating_sub(20));
+    let rows: Vec<(i64, Uuid, String, String, chrono::DateTime<chrono::Utc>, Uuid, Option<Uuid>)> = sqlx::query_as(
+        r#"SELECT m.seq, m.sender_id, p.display_name, m.body, m.created_at, m.client_msg_id, m.share_id FROM messages m
            JOIN profiles p ON p.user_id = m.sender_id
            WHERE m.thread_id = $1 AND m.seq > $2
              AND NOT EXISTS (SELECT 1 FROM blocks b WHERE b.blocker = $3 AND b.blocked = m.sender_id)
@@ -336,10 +343,13 @@ async fn messages(State(state): State<AppState>, user: AuthUser, Path(id): Path<
         .execute(&state.pool)
         .await?;
     }
-    Ok(Json(json!({ "messages": rows.iter().map(|(seq, sender, name, body, at, cid)| json!({
-        "seq": seq, "senderId": sender, "senderName": name, "body": body, "createdAt": at,
-        "clientMsgId": cid, "mine": *sender == user.id,
-    })).collect::<Vec<_>>() })))
+    let mut out = Vec::new();
+    for (seq,sender,name,body,at,cid,share) in rows {
+        let shared = match share { Some(s) => Some(crate::shares::visible(&state,user.id,s).await?), None => None };
+        out.push(json!({"seq":seq,"senderId":sender,"senderName":name,"body":body,"createdAt":at,
+            "clientMsgId":cid,"mine":sender==user.id,"shared":shared}));
+    }
+    Ok(Json(json!({"messages":out,"firstUnreadSeq":read+1})))
 }
 
 #[derive(Deserialize)]
@@ -347,18 +357,27 @@ async fn messages(State(state): State<AppState>, user: AuthUser, Path(id): Path<
 struct SendBody {
     client_msg_id: Uuid,
     body: String,
+    share_id: Option<Uuid>,
 }
 
 async fn send_message(State(state): State<AppState>, user: AuthUser, Path(id): Path<Uuid>, Json(b): Json<SendBody>) -> ApiResult<Json<Value>> {
     let body = b.body.trim();
-    if body.is_empty() || body.chars().count() > 2000 {
+    if (body.is_empty() && b.share_id.is_none()) || body.chars().count() > 2000 {
         return Err(ApiError::BadRequest("Messages are 1 to 2000 characters.".into()));
     }
     thread_access(&state.pool, user.id, id).await?;
+    if let Some(share) = b.share_id {
+        let owned: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM shared_items WHERE id=$1 AND owner_id=$2)")
+            .bind(share).bind(user.id).fetch_one(&state.pool).await?;
+        if !owned { return Err(ApiError::NotFound); }
+    }
     let mut tx = state.pool.begin().await?;
-    let existing: Option<i64> = sqlx::query_scalar("SELECT seq FROM messages WHERE sender_id = $1 AND client_msg_id = $2")
+    // Serialize duplicate checks as well as sequence allocation.
+    sqlx::query("SELECT id FROM threads WHERE id=$1 FOR UPDATE").bind(id).execute(&mut *tx).await?;
+    let existing: Option<i64> = sqlx::query_scalar("SELECT seq FROM messages WHERE sender_id = $1 AND client_msg_id = $2 AND thread_id=$3")
         .bind(user.id)
         .bind(b.client_msg_id)
+        .bind(id)
         .fetch_optional(&mut *tx)
         .await?;
     if let Some(seq) = existing {
@@ -368,12 +387,13 @@ async fn send_message(State(state): State<AppState>, user: AuthUser, Path(id): P
         .bind(id)
         .fetch_one(&mut *tx)
         .await?;
-    sqlx::query("INSERT INTO messages (thread_id, seq, sender_id, client_msg_id, body) VALUES ($1,$2,$3,$4,$5)")
+    sqlx::query("INSERT INTO messages (thread_id, seq, sender_id, client_msg_id, body, share_id) VALUES ($1,$2,$3,$4,$5,$6)")
         .bind(id)
         .bind(seq)
         .bind(user.id)
         .bind(b.client_msg_id)
         .bind(body)
+        .bind(b.share_id)
         .execute(&mut *tx)
         .await?;
     sqlx::query(
@@ -492,9 +512,14 @@ async fn my_leagues(State(state): State<AppState>, user: AuthUser) -> ApiResult<
     .bind(user.id)
     .fetch_all(&state.pool)
     .await?;
-    Ok(Json(json!({ "leagues": rows.iter().map(|(id, name, role, n, thread)| json!({
-        "leagueId": id, "name": name, "role": role, "memberCount": n, "threadId": thread,
-    })).collect::<Vec<_>>() })))
+    let mut out = Vec::new();
+    for (id,name,role,n,thread) in rows {
+        let detail = league_json(&state,user.id,id).await?;
+        let mine = detail["members"].as_array().and_then(|m|m.iter().find(|m|m["isMe"]==true));
+        out.push(json!({"leagueId":id,"name":name,"role":role,"memberCount":n,"threadId":thread,
+            "rank":mine.map(|m|&m["rank"]),"weeklyPoints":mine.map(|m|&m["weeklyPoints"])}));
+    }
+    Ok(Json(json!({"leagues":out})))
 }
 
 async fn league_json(state: &AppState, user_id: Uuid, league_id: Uuid) -> ApiResult<Value> {

@@ -27,6 +27,7 @@ async fn suggestions(State(state): State<AppState>, user: AuthUser) -> ApiResult
     let mut seen = std::collections::HashSet::new();
     let mut out = Vec::new();
     for r in rows {
+        if ss_core::lines::is_game_stat(&r.stat_key) { continue; }
         if !seen.insert(r.player_id) {
             continue;
         }
@@ -34,11 +35,12 @@ async fn suggestions(State(state): State<AppState>, user: AuthUser) -> ApiResult
             .bind(r.player_id)
             .fetch_one(&state.pool)
             .await?;
+        let specs = ss_db::cards::card_specs(&state.pool, &[r.player_id]).await?;
         out.push(json!({
             "label": format!("{name}'s recent {}", r.stat_label.to_lowercase()),
-            "playerId": r.player_id, "statKey": r.stat_key,
+            "playerId": r.player_id, "statKey": r.stat_key, "card": specs.get(&r.player_id),
         }));
-        if out.len() == 3 {
+        if out.len() == 2 {
             break;
         }
     }
@@ -55,7 +57,9 @@ struct FormBody {
 }
 
 async fn form(State(state): State<AppState>, user: AuthUser, Json(b): Json<FormBody>) -> ApiResult<Json<Value>> {
-    Ok(Json(form_report(&state, user.id, b.player_id, &b.stat_key, b.n.unwrap_or(5), b.opponent.as_deref()).await?))
+    let mut report = form_report(&state, user.id, b.player_id, &b.stat_key, b.n.unwrap_or(5), b.opponent.as_deref()).await?;
+    attach_share(&state, user.id, &mut report).await?;
+    Ok(Json(report))
 }
 
 async fn form_report(
@@ -223,11 +227,8 @@ async fn ask(State(state): State<AppState>, user: AuthUser, Json(b): Json<AskBod
     if stat_league.as_deref() != Some(league.as_str()) {
         return Ok(Json(json!({ "kind": "insufficient_data", "answer": format!("That stat doesn't apply to {full_name}.") })));
     }
-    let n = q
-        .split(|c: char| !c.is_ascii_digit())
-        .filter_map(|d| d.parse::<i64>().ok())
-        .find(|d| (1..=20).contains(d))
-        .unwrap_or(5);
+    let n = q.split_once("last ").and_then(|(_, rest)| rest.split_whitespace().next())
+        .and_then(|n| n.parse::<i64>().ok()).unwrap_or(5).clamp(1,20);
     // "against X" / "vs X": match an opponent by team name, location or abbreviation.
     let opponent = match q.split_once(" against ").or_else(|| q.split_once(" vs ")).or_else(|| q.split_once(" versus ")) {
         Some((_, rest)) => {
@@ -244,5 +245,30 @@ async fn ask(State(state): State<AppState>, user: AuthUser, Json(b): Json<AskBod
         }
         None => None,
     };
-    Ok(Json(form_report(&state, user.id, player_id, stat_key, n, opponent.as_deref()).await?))
+    let mut report = form_report(&state, user.id, player_id, stat_key, n, opponent.as_deref()).await?;
+    report["focus"] = json!(if ["clear", "over ", "above", "how often"].iter().any(|w| q.contains(w)) { "line" } else { "form" });
+    if report["kind"] == "form" && report["focus"] == "line" {
+        let threshold = ["cleared ", "clear ", "over ", "above "].iter()
+            .find_map(|word|q.split_once(word).and_then(|(_,rest)|rest.split_whitespace().next())
+                .and_then(|n|n.trim_end_matches('?').parse::<f64>().ok())).filter(|n|n.is_finite());
+        if let Some(line) = threshold {
+            let above = report["games"].as_array().unwrap().iter().filter(|g|g["value"].as_f64().unwrap_or(0.0)>line).count();
+            report["metric"]["requestedLine"] = json!(line);
+            report["metric"]["aboveRequestedLine"] = json!(above);
+        }
+    }
+    attach_share(&state,user.id,&mut report).await?;
+    Ok(Json(report))
+}
+
+async fn attach_share(state: &AppState, user: uuid::Uuid, report: &mut Value) -> ApiResult<()> {
+    if report["kind"] == "form" {
+        let mut snapshot = report.clone();
+        // Public box-score research carries no private pick or wager state.
+        snapshot.as_object_mut().unwrap().remove("alreadyPickedEntryId");
+        snapshot.as_object_mut().unwrap().remove("playable");
+        let id = crate::shares::save(state,user,"research",snapshot).await?;
+        report["shareId"] = json!(id);
+    }
+    Ok(())
 }

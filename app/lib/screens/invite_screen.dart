@@ -29,9 +29,15 @@ class _InviteScreenState extends ConsumerState<InviteScreen> {
     });
     try {
       final r = await api.post('/invites/${widget.token}/accept');
-      if (mounted) context.go('/social/league/${r['leagueId']}');
+      if (mounted) {
+        if (r['threadId'] != null) {
+          context.go('/social/thread/${r['threadId']}?title=${Uri.encodeQueryComponent(r['title'] as String)}');
+        } else {
+          context.go('/social/league/${r['leagueId']}');
+        }
+      }
     } on ApiException catch (e) {
-      setState(() => _error = e.message);
+      if (mounted) setState(() => _error = e.message);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -54,32 +60,46 @@ class _InviteScreenState extends ConsumerState<InviteScreen> {
                 if (!snap.hasData) return const Loading();
                 final p = snap.data!;
                 final valid = p['valid'] == true;
-                return ListView(shrinkWrap: true, padding: const EdgeInsets.all(24), children: [
-                  const Text('LEAGUE INVITE', style: T.label),
-                  const SizedBox(height: 10),
-                  Text(p['leagueName'] as String, style: T.h1),
-                  const SizedBox(height: 8),
-                  Text('${p['inviter']} invited you · ${p['memberCount']} ${p['memberCount'] == 1 ? 'member' : 'members'}', style: T.dim),
-                  const SizedBox(height: 28),
-                  if (!valid)
-                    const Text('This invite has expired. Ask for a new link.', style: TextStyle(color: C.danger))
-                  else if (me == null) ...[
-                    PrimaryButton('Sign up to join',
-                        onPressed: () => context.go('/login?next=${Uri.encodeComponent('/invite/${widget.token}')}')),
+                return ListView(
+                  shrinkWrap: true,
+                  padding: const EdgeInsets.all(24),
+                  children: [
+                    Text(p['kind'] == 'friend' ? 'FRIEND INVITE' : 'LEAGUE INVITE', style: T.label),
+                    const SizedBox(height: 10),
+                    Text(p['leagueName'] as String, style: T.h1),
                     const SizedBox(height: 8),
-                    const Text('You will come back here after signing up.', style: T.small, textAlign: TextAlign.center),
-                  ] else ...[
-                    PrimaryButton('Join ${p['leagueName']}', busy: _busy, onPressed: _accept),
-                    const SizedBox(height: 8),
-                    Text('Joining as ${me.displayName} (${me.handleTag})', style: T.small, textAlign: TextAlign.center),
-                  ],
-                  if (_error != null) ...[
+                    Text(
+                      p['kind'] == 'friend'
+                          ? '${p['inviter']} invited you to make calls and talk sports together.'
+                          : '${p['inviter']} invited you · ${p['memberCount']} members',
+                      style: T.dim,
+                    ),
+                    const SizedBox(height: 28),
+                    if (!valid)
+                      const Text('This invite has expired. Ask for a new link.', style: TextStyle(color: C.danger))
+                    else if (me == null) ...[
+                      PrimaryButton(
+                        'Sign up to join',
+                        onPressed: () => context.go('/login?next=${Uri.encodeComponent('/invite/${widget.token}')}'),
+                      ),
+                      const SizedBox(height: 8),
+                      const Text('You will come back here after signing up.', style: T.small, textAlign: TextAlign.center),
+                    ] else ...[
+                      PrimaryButton(
+                        p['kind'] == 'friend' ? 'Accept & say hello' : 'Join ${p['leagueName']}',
+                        busy: _busy,
+                        onPressed: _accept,
+                      ),
+                      const SizedBox(height: 8),
+                      Text('Joining as ${me.displayName} (${me.handleTag})', style: T.small, textAlign: TextAlign.center),
+                    ],
+                    if (_error != null) ...[const SizedBox(height: 12), Text(_error!, style: const TextStyle(color: C.danger))],
                     const SizedBox(height: 12),
-                    Text(_error!, style: const TextStyle(color: C.danger)),
+                    Center(
+                      child: GhostButton('Not now', color: C.dim, onPressed: () => context.go('/play')),
+                    ),
                   ],
-                  const SizedBox(height: 12),
-                  Center(child: GhostButton('Not now', color: C.dim, onPressed: () => context.go('/play'))),
-                ]);
+                );
               },
             ),
           ),

@@ -9,6 +9,7 @@ mod invites;
 mod packs;
 mod profile;
 mod social;
+mod shares;
 mod state;
 
 use axum::{routing::get, Router};
@@ -38,6 +39,7 @@ async fn main() -> anyhow::Result<()> {
         .merge(admin::routes())
         .merge(contests::routes())
         .merge(social::routes())
+        .merge(shares::routes())
         .merge(invites::routes())
         .merge(profile::routes())
         .merge(analyst::routes())

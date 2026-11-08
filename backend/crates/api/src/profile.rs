@@ -64,7 +64,7 @@ async fn update_profile(State(state): State<AppState>, user: AuthUser, Json(b): 
     Ok(Json(me_json(&state, user.id).await?))
 }
 
-async fn can_view(state: &AppState, viewer: Uuid, target: Uuid) -> ApiResult<bool> {
+pub(crate) async fn can_view(state: &AppState, viewer: Uuid, target: Uuid) -> ApiResult<bool> {
     if viewer == target {
         return Ok(true);
     }
