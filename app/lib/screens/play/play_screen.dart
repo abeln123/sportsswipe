@@ -58,81 +58,87 @@ class _PlayScreenState extends ConsumerState<PlayScreen> with SingleTickerProvid
     final mode = ref.watch(playModeProvider);
     final still = MediaQuery.of(context).disableAnimations;
     final key = mode.contests ? 'contests' : (mode.parlay ? 'parlay-${mode.sport}' : 'packs');
-    return Stack(children: [
-      const Positioned.fill(child: PineBackdrop()),
-      Positioned.fill(
-        child: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 220),
-          switchInCurve: Curves.easeOutCubic,
-          switchOutCurve: Curves.easeIn,
-          transitionBuilder: (child, a) => FadeTransition(opacity: a, child: child),
-          child: switch (mode) {
-            PlayMode(contests: true) => const ContestHub(key: ValueKey('contests')),
-            PlayMode(parlay: true) => ParlayDeck(key: ValueKey(key), sport: mode.sport),
-            _ => PackStore(key: ValueKey(key), sport: mode.sport),
-          },
-        ),
-      ),
-      AnimatedBuilder(
-        animation: _menu,
-        builder: (context, _) => _menu.value == 0
-            ? const SizedBox.shrink()
-            : Positioned.fill(
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: () => ref.read(playMenuProvider.notifier).close(),
-                  child: ColoredBox(color: Colors.black.withValues(alpha: 0.5 * _menu.value)),
-                ),
-              ),
-      ),
-      Positioned(
-        top: 0,
-        left: 0,
-        right: 0,
-        child: AnimatedBuilder(
-          animation: _menu,
-          child: _panel(mode),
-          builder: (context, panel) => IgnorePointer(
-            ignoring: _menu.value < 0.5,
-            child: still
-                ? Opacity(opacity: _menu.value, child: panel)
-                : ClipRect(
-                    child: Align(alignment: Alignment.bottomCenter, heightFactor: _menu.value, child: panel),
-                  ),
+    return Stack(
+      children: [
+        const Positioned.fill(child: PineBackdrop()),
+        Positioned.fill(
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 220),
+            switchInCurve: Curves.easeOutCubic,
+            switchOutCurve: Curves.easeIn,
+            transitionBuilder: (child, a) => FadeTransition(opacity: a, child: child),
+            child: switch (mode) {
+              PlayMode(contests: true) => const ContestHub(key: ValueKey('contests')),
+              PlayMode(parlay: true) => ParlayDeck(key: ValueKey(key), sport: mode.sport),
+              _ => PackStore(key: ValueKey(key), sport: mode.sport),
+            },
           ),
         ),
-      ),
-    ]);
+        AnimatedBuilder(
+          animation: _menu,
+          builder: (context, _) => _menu.value == 0
+              ? const SizedBox.shrink()
+              : Positioned.fill(
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () => ref.read(playMenuProvider.notifier).close(),
+                    child: ColoredBox(color: Colors.black.withValues(alpha: 0.5 * _menu.value)),
+                  ),
+                ),
+        ),
+        Positioned(
+          top: 0,
+          left: 0,
+          right: 0,
+          child: AnimatedBuilder(
+            animation: _menu,
+            child: _panel(mode),
+            builder: (context, panel) => IgnorePointer(
+              ignoring: _menu.value < 0.5,
+              child: still
+                  ? Opacity(opacity: _menu.value, child: panel)
+                  : ClipRect(
+                      child: Align(alignment: Alignment.bottomCenter, heightFactor: _menu.value, child: panel),
+                    ),
+            ),
+          ),
+        ),
+      ],
+    );
   }
 
   Widget _panel(PlayMode mode) => GestureDetector(
-        onVerticalDragUpdate: (d) => _menu.value = (_menu.value + d.delta.dy / 260).clamp(0.0, 1.0),
-        onVerticalDragEnd: (d) {
-          final open = (d.primaryVelocity ?? 0) > -300 && _menu.value > 0.6;
-          if (!open) ref.read(playMenuProvider.notifier).close();
-          _settle(open);
-        },
-        child: Container(
-          decoration: const BoxDecoration(
-            color: C.surface,
-            border: Border(bottom: BorderSide(color: C.line)),
-            boxShadow: [BoxShadow(color: Colors.black38, blurRadius: 24, offset: Offset(0, 12))],
+    onVerticalDragUpdate: (d) => _menu.value = (_menu.value + d.delta.dy / 260).clamp(0.0, 1.0),
+    onVerticalDragEnd: (d) {
+      final open = (d.primaryVelocity ?? 0) > -300 && _menu.value > 0.6;
+      if (!open) ref.read(playMenuProvider.notifier).close();
+      _settle(open);
+    },
+    child: Container(
+      decoration: const BoxDecoration(
+        color: C.surface,
+        border: Border(bottom: BorderSide(color: C.line)),
+        boxShadow: [BoxShadow(color: Colors.black38, blurRadius: 24, offset: Offset(0, 12))],
+      ),
+      padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _Segments(
+            label: 'Play',
+            options: const [('solo', 'Solo'), ('contests', 'Contests')],
+            selected: mode.contests ? 'contests' : 'solo',
+            onSelect: (v) => _set(mode.copyWith(contests: v == 'contests')),
           ),
-          padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            _Segments(
-              label: 'Play',
-              options: const [('solo', 'Solo'), ('contests', 'Contests')],
-              selected: mode.contests ? 'contests' : 'solo',
-              onSelect: (v) => _set(mode.copyWith(contests: v == 'contests')),
-            ),
-            AnimatedSize(
-              duration: const Duration(milliseconds: 200),
-              curve: Curves.easeOutCubic,
-              alignment: Alignment.topCenter,
-              child: mode.contests
-                  ? const SizedBox(width: double.infinity)
-                  : Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          AnimatedSize(
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeOutCubic,
+            alignment: Alignment.topCenter,
+            child: mode.contests
+                ? const SizedBox(width: double.infinity)
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                       _Segments(
                         label: 'Prediction mode',
                         options: const [('packs', 'Packs'), ('parlay', 'Parlay')],
@@ -145,31 +151,33 @@ class _PlayScreenState extends ConsumerState<PlayScreen> with SingleTickerProvid
                         selected: mode.sport,
                         onSelect: (v) => _set(mode.copyWith(sport: v)),
                       ),
-                    ]),
-            ),
-            Semantics(
-              button: true,
-              label: 'Close menu',
-              excludeSemantics: true,
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: () => ref.read(playMenuProvider.notifier).close(),
-                child: SizedBox(
-                  height: 26,
-                  width: double.infinity,
-                  child: Center(
-                    child: Container(
-                      width: 36,
-                      height: 4,
-                      decoration: BoxDecoration(color: C.faint, borderRadius: BorderRadius.circular(2)),
-                    ),
+                    ],
+                  ),
+          ),
+          Semantics(
+            button: true,
+            label: 'Close menu',
+            excludeSemantics: true,
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => ref.read(playMenuProvider.notifier).close(),
+              child: SizedBox(
+                height: 26,
+                width: double.infinity,
+                child: Center(
+                  child: Container(
+                    width: 36,
+                    height: 4,
+                    decoration: BoxDecoration(color: C.faint, borderRadius: BorderRadius.circular(2)),
                   ),
                 ),
               ),
             ),
-          ]),
-        ),
-      );
+          ),
+        ],
+      ),
+    ),
+  );
 }
 
 class _Segments extends StatelessWidget {
@@ -181,11 +189,14 @@ class _Segments extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.only(top: 10),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(label.toUpperCase(), style: T.label.copyWith(fontSize: 11)),
-          const SizedBox(height: 6),
-          Row(children: [
+    padding: const EdgeInsets.only(top: 10),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label.toUpperCase(), style: T.label.copyWith(fontSize: 11)),
+        const SizedBox(height: 6),
+        Row(
+          children: [
             for (final (id, text) in options)
               Expanded(
                 child: Padding(
@@ -199,26 +210,31 @@ class _Segments extends StatelessWidget {
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 180),
                         height: 44,
-                        alignment: Alignment.center,
+                        alignment: Alignment.centerLeft,
+                        padding: const EdgeInsets.only(left: 10),
                         decoration: BoxDecoration(
-                          color: id == selected ? C.green.withValues(alpha: 0.12) : Colors.transparent,
-                          border: Border.all(color: id == selected ? C.green : C.line),
-                          borderRadius: BorderRadius.circular(10),
+                          border: Border(
+                            bottom: BorderSide(color: id == selected ? C.green : C.line, width: id == selected ? 2 : 1),
+                          ),
                         ),
-                        child: Text(text,
-                            style: TextStyle(
-                              fontSize: 14.5,
-                              fontWeight: id == selected ? FontWeight.w700 : FontWeight.w500,
-                              color: id == selected ? C.green : C.dim,
-                            )),
+                        child: Text(
+                          text,
+                          style: TextStyle(
+                            fontSize: 14.5,
+                            fontWeight: id == selected ? FontWeight.w700 : FontWeight.w500,
+                            color: id == selected ? C.green : C.dim,
+                          ),
+                        ),
                       ),
                     ),
                   ),
                 ),
               ),
-          ]),
-        ]),
-      );
+          ],
+        ),
+      ],
+    ),
+  );
 }
 
 /// Deep pine surface with two oversized diagonal cuts at the upper right.

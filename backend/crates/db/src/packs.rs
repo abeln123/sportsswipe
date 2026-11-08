@@ -19,6 +19,7 @@ pub struct PackType {
     pub league: Option<String>,
     pub kind: String,
     pub positions: Option<Vec<String>>,
+    pub team_id: Option<i64>,
     pub target_pct: Option<i32>,
     pub multiplier: Option<i32>,
     pub foil: String,
@@ -31,7 +32,7 @@ impl PackType {
 
     /// The league this pack deals from under the shopper's sport filter, or
     /// None (any league). Err means the pack has nothing for that sport.
-    fn league_for(&self, sport: Option<&str>) -> std::result::Result<Option<String>, ()> {
+    pub fn league_for(&self, sport: Option<&str>) -> std::result::Result<Option<String>, ()> {
         match (&self.league, sport) {
             (Some(l), Some(s)) if l != s => Err(()),
             (Some(l), _) => Ok(Some(l.clone())),
@@ -42,32 +43,35 @@ impl PackType {
     pub fn json(&self, available: i64) -> Value {
         json!({
             "key": self.key, "name": self.name, "tagline": self.tagline, "price": self.price,
-            "size": self.size, "league": self.league, "kind": self.kind,
+            "size": self.size, "teamId": self.team_id, "packsRemaining": available / i64::from(self.size), "league": self.league, "kind": self.kind,
             "targetPct": self.target_pct, "multiplier": self.multiplier, "payout": self.payout(),
             "foil": self.foil.split(',').collect::<Vec<_>>(), "available": available,
         })
     }
 }
 
-const PACK_COLS: &str = "key, name, tagline, price, size, league, kind, positions, target_pct, multiplier, foil";
+const PACK_COLS: &str = "key, name, tagline, price, size, league, kind, positions, team_id, target_pct, multiplier, foil";
 
 pub async fn pack_types(pool: &PgPool) -> Result<Vec<PackType>> {
     Ok(sqlx::query_as(&format!("SELECT {PACK_COLS} FROM pack_types WHERE active ORDER BY sort")).fetch_all(pool).await?)
 }
 
 /// Open lines a pack could deal to this user: still well before lock, not
-/// already picked as a single, and not sitting unplayed in another pack.
+/// already played in any entry or ever dealt in another pack.
 const CANDIDATES: &str = r#"
     WITH ranked AS (
-        SELECT m.id, p.league, p.position, m.stat_key,
+        SELECT m.id, p.league, p.position, p.team_id, g.home_team_id, g.away_team_id, m.stat_key,
                row_number() OVER (PARTITION BY m.stat_key ORDER BY lv.line_x10 DESC, m.id) AS stat_rank
         FROM markets m
         JOIN players p ON p.id = m.player_id
+        JOIN games g ON g.id = m.game_id
         JOIN line_versions lv ON lv.market_id = m.id AND lv.version = m.current_version
         WHERE m.status = 'open' AND m.lock_at > now() + interval '5 minutes'
     )
     SELECT {select} FROM ranked r
     WHERE ($2::text IS NULL OR r.league = $2)
+      AND ($6::bigint IS NULL OR (r.team_id = $6 AND NOT (r.stat_key = ANY($5)))
+           OR (r.stat_key = ANY($5) AND $6 IN (r.home_team_id, r.away_team_id)))
       AND CASE $3
             WHEN 'game' THEN r.stat_key = ANY($5)
             WHEN 'position' THEN r.position = ANY($4) AND NOT (r.stat_key = ANY($5))
@@ -75,7 +79,9 @@ const CANDIDATES: &str = r#"
             ELSE true END
       AND NOT EXISTS (SELECT 1 FROM entries e WHERE e.user_id = $1 AND e.single_market_id = r.id)
       AND NOT EXISTS (SELECT 1 FROM pack_cards pc JOIN pack_purchases pp ON pp.id = pc.purchase_id
-                      WHERE pp.user_id = $1 AND pc.market_id = r.id AND pc.entry_id IS NULL)
+                      WHERE pp.user_id = $1 AND pc.market_id = r.id)
+      AND NOT EXISTS (SELECT 1 FROM entry_legs el JOIN entries e ON e.id = el.entry_id
+                      WHERE e.user_id = $1 AND el.market_id = r.id)
 "#;
 
 fn game_keys() -> Vec<String> {
@@ -90,6 +96,7 @@ pub async fn available(pool: &PgPool, user_id: Uuid, pack: &PackType, sport: Opt
         .bind(&pack.kind)
         .bind(pack.positions.clone().unwrap_or_default())
         .bind(game_keys())
+        .bind(pack.team_id)
         .fetch_one(pool)
         .await?)
 }
@@ -100,12 +107,13 @@ async fn deal(
     pack: &PackType,
     league: Option<String>,
 ) -> Result<Vec<i64>> {
-    Ok(sqlx::query_scalar(&format!("{} ORDER BY random() LIMIT $6", CANDIDATES.replace("{select}", "r.id")))
+    Ok(sqlx::query_scalar(&format!("{} ORDER BY random() LIMIT $7", CANDIDATES.replace("{select}", "r.id")))
         .bind(user_id)
         .bind(league)
         .bind(&pack.kind)
         .bind(pack.positions.clone().unwrap_or_default())
         .bind(game_keys())
+        .bind(pack.team_id)
         .bind(pack.size as i64)
         .fetch_all(&mut **tx)
         .await?)
@@ -138,7 +146,7 @@ pub async fn buy(pool: &PgPool, user_id: Uuid, command_id: Uuid, pack_key: &str,
         return Ok(reject(409, "sold_out", "This pack has no cards for that sport."));
     };
     let cards = deal(&mut tx, user_id, &pack, league).await?;
-    if cards.len() < (pack.size as usize).min(3) {
+    if cards.len() < pack.size as usize {
         return Ok(reject(409, "sold_out", "Not enough open lines for this pack right now. Check back before the next games."));
     }
     let wallet: Option<(i64, i64)> = sqlx::query_as(

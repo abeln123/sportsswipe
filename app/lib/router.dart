@@ -39,41 +39,69 @@ final router = GoRouter(
   redirect: _redirect,
   routes: [
     GoRoute(path: '/', redirect: (_, _) => '/play'),
+    GoRoute(path: '/loading', builder: (_, _) => const Scaffold()),
     GoRoute(
-      path: '/loading',
-      builder: (_, _) => const Scaffold(),
+      path: '/login',
+      builder: (_, s) => AuthScreen(next: s.uri.queryParameters['next']),
     ),
-    GoRoute(path: '/login', builder: (_, s) => AuthScreen(next: s.uri.queryParameters['next'])),
-    GoRoute(path: '/invite/:token', builder: (_, s) => InviteScreen(token: s.pathParameters['token']!)),
+    GoRoute(
+      path: '/invite/:token',
+      builder: (_, s) => InviteScreen(token: s.pathParameters['token']!),
+    ),
     StatefulShellRoute.indexedStack(
       builder: (_, _, shell) => AppShell(shell: shell),
       branches: [
-        StatefulShellBranch(routes: [
-          GoRoute(path: '/play', builder: (_, _) => const PlayScreen(), routes: [
-            GoRoute(path: 'contest/:dayId', builder: (_, s) => ContestEntryScreen(dayId: int.parse(s.pathParameters['dayId']!))),
-          ]),
-        ]),
-        StatefulShellBranch(routes: [
-          GoRoute(path: '/picks', builder: (_, _) => const PicksScreen()),
-        ]),
-        StatefulShellBranch(routes: [
-          GoRoute(path: '/social', builder: (_, s) => SocialScreen(initialTab: int.tryParse(s.uri.queryParameters['tab'] ?? '') ?? 0), routes: [
+        StatefulShellBranch(
+          routes: [
             GoRoute(
-              path: 'thread/:id',
-              builder: (_, s) => ThreadScreen(threadId: s.pathParameters['id']!, title: s.uri.queryParameters['title'] ?? 'Messages'),
+              path: '/play',
+              builder: (_, _) => const PlayScreen(),
+              routes: [
+                GoRoute(
+                  path: 'contest/:dayId',
+                  builder: (_, s) => ContestEntryScreen(dayId: int.parse(s.pathParameters['dayId']!)),
+                ),
+              ],
             ),
-            GoRoute(path: 'league/:id', builder: (_, s) => LeagueScreen(leagueId: s.pathParameters['id']!)),
-            GoRoute(path: 'user/:id', builder: (_, s) => UserProfileScreen(userId: s.pathParameters['id']!)),
-          ]),
-        ]),
-        StatefulShellBranch(routes: [
-          GoRoute(path: '/ai', builder: (_, _) => const AiScreen()),
-        ]),
-        StatefulShellBranch(routes: [
-          GoRoute(path: '/profile', builder: (_, s) => ProfileScreen(initialTab: int.tryParse(s.uri.queryParameters['tab'] ?? '') ?? 0), routes: [
-            GoRoute(path: 'admin', builder: (_, _) => const AdminScreen()),
-          ]),
-        ]),
+          ],
+        ),
+        StatefulShellBranch(
+          routes: [GoRoute(path: '/picks', builder: (_, _) => const PicksScreen())],
+        ),
+        StatefulShellBranch(
+          routes: [GoRoute(path: '/ai', builder: (_, _) => const AiScreen())],
+        ),
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
+              path: '/social',
+              builder: (_, s) => SocialScreen(initialTab: int.tryParse(s.uri.queryParameters['tab'] ?? '') ?? 0),
+              routes: [
+                GoRoute(
+                  path: 'thread/:id',
+                  builder: (_, s) => ThreadScreen(threadId: s.pathParameters['id']!, title: s.uri.queryParameters['title'] ?? 'Messages'),
+                ),
+                GoRoute(
+                  path: 'league/:id',
+                  builder: (_, s) => LeagueScreen(leagueId: s.pathParameters['id']!),
+                ),
+                GoRoute(
+                  path: 'user/:id',
+                  builder: (_, s) => UserProfileScreen(userId: s.pathParameters['id']!),
+                ),
+              ],
+            ),
+          ],
+        ),
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
+              path: '/profile',
+              builder: (_, s) => ProfileScreen(initialTab: int.tryParse(s.uri.queryParameters['tab'] ?? '') ?? 0),
+              routes: [GoRoute(path: 'admin', builder: (_, _) => const AdminScreen())],
+            ),
+          ],
+        ),
       ],
     ),
   ],

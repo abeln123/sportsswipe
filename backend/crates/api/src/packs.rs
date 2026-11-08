@@ -37,6 +37,9 @@ async fn store(State(state): State<AppState>, user: AuthUser, Query(q): Query<Sp
     let league = league(q.sport.as_deref())?;
     let mut packs = Vec::new();
     for p in ss_db::packs::pack_types(&state.pool).await? {
+        if p.league_for(league).is_err() {
+            continue;
+        }
         let available = ss_db::packs::available(&state.pool, user.id, &p, league).await?;
         packs.push(p.json(available));
     }

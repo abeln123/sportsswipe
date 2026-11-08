@@ -47,10 +47,12 @@ class PhoneFrame extends StatelessWidget {
               ),
               child: Material(
                 type: MaterialType.transparency,
-                child: Stack(children: [
-                  Positioned.fill(child: child),
-                  const Positioned(top: 0, left: 0, right: 0, child: _StatusBar()),
-                ]),
+                child: Stack(
+                  children: [
+                    Positioned.fill(child: child),
+                    const Positioned(top: 0, left: 0, right: 0, child: _StatusBar()),
+                  ],
+                ),
               ),
             ),
           ),
@@ -64,26 +66,34 @@ class _StatusBar extends StatelessWidget {
   const _StatusBar();
   @override
   Widget build(BuildContext context) => IgnorePointer(
-        child: SizedBox(
-          height: 44,
-          child: Stack(children: [
-            const Positioned(
-              left: 34,
-              top: 14,
-              child: Text('9:41', style: TextStyle(color: C.text, fontWeight: FontWeight.w700, fontSize: 15)),
+    child: SizedBox(
+      height: 44,
+      child: Stack(
+        children: [
+          const Positioned(
+            left: 34,
+            top: 14,
+            child: Text(
+              '9:41',
+              style: TextStyle(color: C.text, fontWeight: FontWeight.w700, fontSize: 15),
             ),
-            Align(
-              alignment: const Alignment(0, 0.2),
-              child: Container(width: 118, height: 30, decoration: BoxDecoration(color: Colors.black, borderRadius: BorderRadius.circular(20))),
+          ),
+          Align(
+            alignment: const Alignment(0, 0.2),
+            child: Container(
+              width: 118,
+              height: 30,
+              decoration: BoxDecoration(color: Colors.black, borderRadius: BorderRadius.circular(20)),
             ),
-            const Positioned(right: 30, top: 14, child: Icon(Icons.signal_cellular_alt, size: 16, color: C.text)),
-          ]),
-        ),
-      );
+          ),
+          const Positioned(right: 30, top: 14, child: Icon(Icons.signal_cellular_alt, size: 16, color: C.text)),
+        ],
+      ),
+    ),
+  );
 }
 
-/// Top bar. On Play it is also the way in: where you are on the left, the
-/// menu on the right; elsewhere it only shows coins.
+/// Top bar with one Play menu on the left and the coin balance on the right.
 class AppHeader extends ConsumerWidget {
   const AppHeader({super.key, this.play = false});
   final bool play;
@@ -99,73 +109,50 @@ class AppHeader extends ConsumerWidget {
       height: 48,
       child: Padding(
         padding: EdgeInsets.only(left: play ? 8 : 16, right: play ? 4 : 16),
-        child: Row(children: [
-          if (play)
-            Semantics(
-              button: true,
-              expanded: open,
-              label: '${mode.place}, change mode and sport',
-              excludeSemantics: true,
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: toggle,
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    child: Row(mainAxisSize: MainAxisSize.min, children: [
-                      AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 180),
-                        child: Text(mode.place,
-                            key: ValueKey(mode.place),
-                            style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800, color: C.text, letterSpacing: -0.2)),
-                      ),
-                      const SizedBox(width: 4),
-                      AnimatedRotation(
-                        turns: open ? 0.5 : 0,
-                        duration: const Duration(milliseconds: 200),
-                        child: const Icon(Icons.keyboard_arrow_down_rounded, size: 22, color: C.dim),
-                      ),
-                    ]),
+        child: Row(
+          children: [
+            if (play)
+              Semantics(
+                button: true,
+                expanded: open,
+                label: '${mode.place}, change mode and sport',
+                excludeSemantics: true,
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: toggle,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+                    child: Center(child: _MenuGlyph(open: open)),
                   ),
                 ),
               ),
-            ),
-          const Spacer(),
-          Semantics(
-            label: 'Coin balance ${f.coins(balance)}',
-            excludeSemantics: true,
-            child: Row(mainAxisSize: MainAxisSize.min, children: [
-              const CoinGlyph(),
-              const SizedBox(width: 6),
-              AnimatedSwitcher(
-                duration: const Duration(milliseconds: 200),
-                child: Text(
-                  loaded ? f.coins(balance) : '—',
-                  key: ValueKey(loaded ? balance : -1),
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: C.text,
-                    fontFeatures: [FontFeature.tabularFigures()],
-                  ),
-                ),
-              ),
-            ]),
-          ),
-          if (play)
+            const Spacer(),
             Semantics(
-              button: true,
-              expanded: open,
-              label: open ? 'Close menu' : 'Menu',
+              label: 'Coin balance ${f.coins(balance)}',
               excludeSemantics: true,
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: toggle,
-                child: SizedBox(width: 48, height: 44, child: Center(child: _MenuGlyph(open: open))),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const CoinGlyph(),
+                  const SizedBox(width: 6),
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 200),
+                    child: Text(
+                      loaded ? f.coins(balance) : '—',
+                      key: ValueKey(loaded ? balance : -1),
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: C.text,
+                        fontFeatures: [FontFeature.tabularFigures()],
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-        ]),
+          ],
+        ),
       ),
     );
   }
@@ -179,17 +166,23 @@ class CoinGlyph extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: color, width: 1.6)),
-        child: Center(
-          child: Container(
-            width: size * 0.42,
-            height: size * 0.42,
-            decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: color, width: 1.2)),
-          ),
+    width: size,
+    height: size,
+    decoration: BoxDecoration(
+      shape: BoxShape.circle,
+      border: Border.all(color: color, width: 1.6),
+    ),
+    child: Center(
+      child: Container(
+        width: size * 0.42,
+        height: size * 0.42,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(color: color, width: 1.2),
         ),
-      );
+      ),
+    ),
+  );
 }
 
 /// Three lines that fold into an X while the menu is open.
@@ -199,11 +192,11 @@ class _MenuGlyph extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => TweenAnimationBuilder<double>(
-        tween: Tween(end: open ? 1 : 0),
-        duration: const Duration(milliseconds: 220),
-        curve: Curves.easeOutCubic,
-        builder: (context, t, _) => CustomPaint(size: const Size(22, 16), painter: _MenuPainter(t)),
-      );
+    tween: Tween(end: open ? 1 : 0),
+    duration: const Duration(milliseconds: 220),
+    curve: Curves.easeOutCubic,
+    builder: (context, t, _) => CustomPaint(size: const Size(22, 16), painter: _MenuPainter(t)),
+  );
 }
 
 class _MenuPainter extends CustomPainter {
@@ -304,45 +297,63 @@ class ReceiptBar extends ConsumerWidget {
               key: ValueKey(r.commandId),
               height: 40,
               padding: const EdgeInsets.only(left: 16, right: 6),
-              decoration: const BoxDecoration(color: C.bg, border: Border(top: BorderSide(color: C.line))),
-              child: Row(children: [
-                Expanded(
-                  child: Text(r.text,
-                      maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13.5, color: C.text)),
-                ),
-                AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 180),
-                  child: KeyedSubtree(key: ValueKey(r.status), child: _trailing(r, ref)),
-                ),
-              ]),
+              decoration: const BoxDecoration(
+                color: C.bg,
+                border: Border(top: BorderSide(color: C.line)),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      r.text,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 13.5, color: C.text),
+                    ),
+                  ),
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 180),
+                    child: KeyedSubtree(key: ValueKey(r.status), child: _trailing(r, ref)),
+                  ),
+                ],
+              ),
             ),
     );
   }
 
   Widget _trailing(Receipt r, WidgetRef ref) => switch (r.status) {
-        'holding' => TextButton(
-            onPressed: () => ref.read(receiptProvider.notifier).undo(),
-            style: TextButton.styleFrom(minimumSize: const Size(56, 40), foregroundColor: C.text),
-            child: const Text('Undo', style: TextStyle(fontWeight: FontWeight.w700, decoration: TextDecoration.underline)),
+    'holding' => TextButton(
+      onPressed: () => ref.read(receiptProvider.notifier).undo(),
+      style: TextButton.styleFrom(minimumSize: const Size(56, 40), foregroundColor: C.text),
+      child: const Text(
+        'Undo',
+        style: TextStyle(fontWeight: FontWeight.w700, decoration: TextDecoration.underline),
+      ),
+    ),
+    'slow' => const Padding(
+      padding: EdgeInsets.only(right: 10),
+      child: Text('Submitting…', style: TextStyle(fontSize: 13, color: C.dim)),
+    ),
+    'submitted' => const Padding(
+      padding: EdgeInsets.only(right: 10),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.check_rounded, size: 16, color: C.green),
+          SizedBox(width: 4),
+          Text(
+            'Pick submitted',
+            style: TextStyle(fontSize: 13, color: C.green, fontWeight: FontWeight.w600),
           ),
-        'slow' => const Padding(
-            padding: EdgeInsets.only(right: 10),
-            child: Text('Submitting…', style: TextStyle(fontSize: 13, color: C.dim)),
-          ),
-        'submitted' => const Padding(
-            padding: EdgeInsets.only(right: 10),
-            child: Row(mainAxisSize: MainAxisSize.min, children: [
-              Icon(Icons.check_rounded, size: 16, color: C.green),
-              SizedBox(width: 4),
-              Text('Pick submitted', style: TextStyle(fontSize: 13, color: C.green, fontWeight: FontWeight.w600)),
-            ]),
-          ),
-        'rejected' => Padding(
-            padding: const EdgeInsets.only(right: 10),
-            child: Text(r.error ?? 'Not accepted', style: const TextStyle(fontSize: 13, color: C.danger)),
-          ),
-        _ => const SizedBox(width: 10),
-      };
+        ],
+      ),
+    ),
+    'rejected' => Padding(
+      padding: const EdgeInsets.only(right: 10),
+      child: Text(r.error ?? 'Not accepted', style: const TextStyle(fontSize: 13, color: C.danger)),
+    ),
+    _ => const SizedBox(width: 10),
+  };
 }
 
 class AppShell extends ConsumerStatefulWidget {
@@ -442,78 +453,101 @@ class _AppShellState extends ConsumerState<AppShell> with SingleTickerProviderSt
     const items = [
       (Icons.style_outlined, 'Play'),
       (Icons.receipt_long_outlined, 'My picks'),
-      (Icons.people_outline, 'Social'),
       (Icons.chat_outlined, 'AI'),
+      (Icons.people_outline, 'Social'),
       (Icons.person_outline, 'Profile'),
     ];
     return Scaffold(
       body: SafeArea(
         bottom: false,
-        child: Column(children: [
-          AppHeader(play: current == 0),
-          Expanded(
-            child: FadeTransition(
-              opacity: CurvedAnimation(parent: _tabFade, curve: Curves.easeOut),
-              child: SlideTransition(
-                position: Tween(begin: const Offset(0, 0.012), end: Offset.zero)
-                    .animate(CurvedAnimation(parent: _tabFade, curve: Curves.easeOutCubic)),
-                child: widget.shell,
+        child: Column(
+          children: [
+            AppHeader(play: current == 0),
+            Expanded(
+              child: FadeTransition(
+                opacity: CurvedAnimation(parent: _tabFade, curve: Curves.easeOut),
+                child: SlideTransition(
+                  position: Tween(
+                    begin: const Offset(0, 0.012),
+                    end: Offset.zero,
+                  ).animate(CurvedAnimation(parent: _tabFade, curve: Curves.easeOutCubic)),
+                  child: widget.shell,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+      bottomNavigationBar: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const ReceiptBar(),
+          Container(
+            decoration: const BoxDecoration(
+              color: C.bg,
+              border: Border(top: BorderSide(color: C.line)),
+            ),
+            child: SafeArea(
+              top: false,
+              child: SizedBox(
+                height: 66,
+                child: Row(
+                  children: [
+                    for (var i = 0; i < items.length; i++)
+                      Expanded(
+                        child: InkWell(
+                          onTap: () => _goBranch(i),
+                          child: Semantics(
+                            selected: i == widget.shell.currentIndex,
+                            label: i == 1 && badge > 0 ? '${items[i].$2}, $badge new ${badge == 1 ? 'result' : 'results'}' : items[i].$2,
+                            button: true,
+                            excludeSemantics: true,
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Stack(
+                                  clipBehavior: Clip.none,
+                                  children: [
+                                    if (i == 0)
+                                      PlayGlyph(selected: current == 0, color: current == 0 ? C.green : C.dim)
+                                    else
+                                      Icon(items[i].$1, color: i == current ? C.green : C.dim, size: 24),
+                                    if (i == 1 && badge > 0)
+                                      Positioned(
+                                        right: -16,
+                                        top: -8,
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                                          color: const Color(0xFFD5F5C8),
+                                          child: Text(
+                                            '$badge',
+                                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Color(0xFF0D2416)),
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  items[i].$2,
+                                  style: TextStyle(
+                                    fontSize: 12.5,
+                                    fontWeight: i == widget.shell.currentIndex ? FontWeight.w700 : FontWeight.w500,
+                                    color: i == widget.shell.currentIndex ? C.green : C.dim,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
               ),
             ),
           ),
-        ]),
+        ],
       ),
-      bottomNavigationBar: Column(mainAxisSize: MainAxisSize.min, children: [
-        const ReceiptBar(),
-        Container(
-        decoration: const BoxDecoration(color: C.bg, border: Border(top: BorderSide(color: C.line))),
-        child: SafeArea(
-          top: false,
-          child: SizedBox(
-            height: 66,
-            child: Row(children: [
-              for (var i = 0; i < items.length; i++)
-                Expanded(
-                  child: InkWell(
-                    onTap: () => _goBranch(i),
-                    child: Semantics(
-                      selected: i == widget.shell.currentIndex,
-                      label: i == 1 && badge > 0 ? '${items[i].$2}, $badge new ${badge == 1 ? 'result' : 'results'}' : items[i].$2,
-                      button: true,
-                      excludeSemantics: true,
-                      child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                        Stack(clipBehavior: Clip.none, children: [
-                          if (i == 0)
-                            PlayGlyph(selected: current == 0, color: current == 0 ? C.green : C.dim)
-                          else
-                            Icon(items[i].$1, color: i == current ? C.green : C.dim, size: 24),
-                          if (i == 1 && badge > 0)
-                            Positioned(
-                              right: -16,
-                              top: -8,
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                                color: const Color(0xFFD5F5C8),
-                                child: Text('$badge', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Color(0xFF0D2416))),
-                              ),
-                            ),
-                        ]),
-                        const SizedBox(height: 6),
-                        Text(items[i].$2,
-                            style: TextStyle(
-                              fontSize: 12.5,
-                              fontWeight: i == widget.shell.currentIndex ? FontWeight.w700 : FontWeight.w500,
-                              color: i == widget.shell.currentIndex ? C.green : C.dim,
-                            )),
-                      ]),
-                    ),
-                  ),
-                ),
-            ]),
-          ),
-        ),
-      ),
-      ]),
     );
   }
 }
