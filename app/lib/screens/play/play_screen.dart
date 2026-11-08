@@ -66,10 +66,12 @@ class _PlayScreenState extends ConsumerState<PlayScreen> with SingleTickerProvid
     final key = ValueKey('${mode.place}-${mode.sport}-${mode.revision}');
     final navigation = PlayNavigation(mode: mode, onSelect: _select);
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (!cards) navigation,
         Expanded(
           child: Stack(
+            fit: StackFit.expand,
             clipBehavior: Clip.hardEdge,
             children: [
               const Positioned.fill(child: PineBackdrop()),
