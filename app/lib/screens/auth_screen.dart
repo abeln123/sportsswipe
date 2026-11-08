@@ -61,72 +61,76 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
       _Mode.login => ('Welcome back', 'Log in'),
     };
     return Scaffold(
-      body: SafeArea(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 420),
-            child: ListView(
-              shrinkWrap: true,
-              padding: const EdgeInsets.all(24),
-              children: [
-                Row(children: [
-                  Transform(transform: Matrix4.skewX(-0.3), child: Container(width: 14, height: 24, color: C.green)),
-                  const SizedBox(width: 12),
-                  const Text('Sports Swipe', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800)),
-                ]),
-                const SizedBox(height: 28),
-                Text(title, style: T.h1),
-                if (_fromInvite) ...[
-                  const SizedBox(height: 8),
-                  const Text('Sign up or log in to accept your league invite.', style: T.dim),
-                ],
-                const SizedBox(height: 22),
-                AutofillGroup(
-                  child: Column(children: [
-                    if (_mode != _Mode.login)
-                      TextField(
-                        controller: _name,
-                        decoration: InputDecoration(labelText: _mode == _Mode.quick ? 'Your name' : 'Display name'),
-                        autofillHints: const [AutofillHints.name],
-                        textCapitalization: TextCapitalization.words,
-                        textInputAction: _mode == _Mode.quick ? TextInputAction.go : TextInputAction.next,
-                        onSubmitted: _mode == _Mode.quick ? (_) => _submit() : null,
-                      ),
-                    TextField(
-                      controller: _email,
-                      decoration: InputDecoration(labelText: _mode == _Mode.quick ? 'Email (optional)' : 'Email'),
-                      keyboardType: TextInputType.emailAddress,
-                      autofillHints: const [AutofillHints.email],
-                      textInputAction: _mode == _Mode.quick ? TextInputAction.go : TextInputAction.next,
-                      onSubmitted: _mode == _Mode.quick ? (_) => _submit() : null,
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          const Positioned.fill(child: PineBackdrop()),
+          SafeArea(
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 420),
+                child: ListView(
+                  shrinkWrap: true,
+                  padding: const EdgeInsets.all(24),
+                  children: [
+                    Row(children: [
+                      Transform(transform: Matrix4.skewX(-0.3), child: Container(width: 14, height: 24, color: C.green)),
+                      const SizedBox(width: 12),
+                      const Text('Sports Swipe', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800)),
+                    ]),
+                    const SizedBox(height: 28),
+                    Text(title, style: T.h1),
+                    if (_fromInvite) ...[
+                      const SizedBox(height: 8),
+                      const Text('Sign up or log in to accept your league invite.', style: T.dim),
+                    ],
+                    const SizedBox(height: 22),
+                    AutofillGroup(
+                      child: Column(children: [
+                        if (_mode != _Mode.login)
+                          TextField(
+                            controller: _name,
+                            decoration: InputDecoration(labelText: _mode == _Mode.quick ? 'Your name' : 'Display name'),
+                            autofillHints: const [AutofillHints.name],
+                            textCapitalization: TextCapitalization.words,
+                            textInputAction: _mode == _Mode.quick ? TextInputAction.go : TextInputAction.next,
+                            onSubmitted: _mode == _Mode.quick ? (_) => _submit() : null,
+                          ),
+                        TextField(
+                          controller: _email,
+                          decoration: InputDecoration(labelText: _mode == _Mode.quick ? 'Email (optional)' : 'Email'),
+                          keyboardType: TextInputType.emailAddress,
+                          autofillHints: const [AutofillHints.email],
+                          textInputAction: _mode == _Mode.quick ? TextInputAction.go : TextInputAction.next,
+                          onSubmitted: _mode == _Mode.quick ? (_) => _submit() : null,
+                        ),
+                        if (_mode != _Mode.quick)
+                          TextField(
+                            controller: _password,
+                            decoration: InputDecoration(labelText: _mode == _Mode.signup ? 'Password (8+ characters)' : 'Password'),
+                            obscureText: true,
+                            autofillHints: [_mode == _Mode.signup ? AutofillHints.newPassword : AutofillHints.password],
+                            onSubmitted: (_) => _submit(),
+                          ),
+                      ]),
                     ),
-                    if (_mode != _Mode.quick)
-                      TextField(
-                        controller: _password,
-                        decoration: InputDecoration(labelText: _mode == _Mode.signup ? 'Password (8+ characters)' : 'Password'),
-                        obscureText: true,
-                        autofillHints: [_mode == _Mode.signup ? AutofillHints.newPassword : AutofillHints.password],
-                        onSubmitted: (_) => _submit(),
-                      ),
-                  ]),
+                    if (_error != null) ...[
+                      const SizedBox(height: 14),
+                      Text(_error!, style: const TextStyle(color: C.danger)),
+                    ],
+                    const SizedBox(height: 26),
+                    PrimaryButton(action, busy: _busy, onPressed: _submit),
+                    const SizedBox(height: 10),
+                    Wrap(alignment: WrapAlignment.center, spacing: 4, children: [
+                      if (_mode != _Mode.quick) GhostButton('Quick start', color: C.dim, onPressed: () => _switch(_Mode.quick)),
+                      if (_mode != _Mode.signup) GhostButton('Sign up with a password', color: C.dim, onPressed: () => _switch(_Mode.signup)),
+                      if (_mode != _Mode.login) GhostButton('Log in', color: C.dim, onPressed: () => _switch(_Mode.login)),
+                    ]),
+                  ],
                 ),
-                if (_error != null) ...[
-                  const SizedBox(height: 14),
-                  Text(_error!, style: const TextStyle(color: C.danger)),
-                ],
-                const SizedBox(height: 26),
-                PrimaryButton(action, busy: _busy, onPressed: _submit),
-                const SizedBox(height: 10),
-                Wrap(alignment: WrapAlignment.center, spacing: 4, children: [
-                  if (_mode != _Mode.quick) GhostButton('Quick start', color: C.dim, onPressed: () => _switch(_Mode.quick)),
-                  if (_mode != _Mode.signup) GhostButton('Sign up with a password', color: C.dim, onPressed: () => _switch(_Mode.signup)),
-                  if (_mode != _Mode.login) GhostButton('Log in', color: C.dim, onPressed: () => _switch(_Mode.login)),
-                ]),
-              ],
+              ),
             ),
           ),
-        ),
-      ),
         ],
       ),
     );

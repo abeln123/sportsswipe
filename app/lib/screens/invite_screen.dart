@@ -104,8 +104,10 @@ class _InviteScreenState extends ConsumerState<InviteScreen> {
                 );
               },
             ),
+              ),
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
